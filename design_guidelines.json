@@ -1,0 +1,160 @@
+{
+  "project_title": "Marketplace & UMKM Seller KPI Analytics & Reporting SaaS (IdSeller Pulse)",
+  "context_type": "DASHBOARDS & ADMIN PANELS + SAAS APP",
+  "theme_strategy": {
+    "default_mode": "dark",
+    "toggle_supported": true,
+    "rationale": "High-density daily ecommerce operations benefit from rich contrast, low eye fatigue during long sessions, and distinct status color highlights (Green/Amber/Red for KPI achievement)."
+  },
+  "typography": {
+    "font_family_heading": "Cabinet Grotesk, Plus Jakarta Sans, sans-serif",
+    "font_family_body": "Plus Jakarta Sans, Inter, sans-serif",
+    "font_family_mono": "JetBrains Mono, monospace",
+    "font_pair_archetype": "Swiss & High-Contrast Utility (Authority, Precision & Clarity)",
+    "rules": {
+      "H1_Hero": "text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight",
+      "H2_Section": "text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight",
+      "H3_Subsection": "text-lg sm:text-xl font-semibold tracking-normal",
+      "Overline_Label": "text-xs font-semibold uppercase tracking-widest text-emerald-400 dark:text-emerald-400",
+      "Body_Regular": "text-sm sm:text-base font-normal leading-relaxed text-slate-300",
+      "Metric_Value": "font-mono text-2xl sm:text-3xl font-bold tracking-tight text-white"
+    }
+  },
+  "colors": {
+    "archetype": "Tactical Emerald & Slate (ARCHETYPE 2: The Performance Pro / Command Center)",
+    "palette": {
+      "background_dark": "#0B0F17",
+      "surface_dark": "#111827",
+      "surface_border_dark": "#1F2937",
+      "surface_card_dark": "#161F30",
+      "primary_accent": "#10B981",
+      "primary_accent_hover": "#059669",
+      "secondary_accent": "#3B82F6",
+      "warning_amber": "#F59E0B",
+      "danger_red": "#EF4444",
+      "kpi_green": "#22C55E",
+      "text_muted": "#9CA3AF",
+      "text_main": "#F9FAFB"
+    },
+    "forbidden_colors": ["#1B93A4", "#7351B7"],
+    "platform_badge_colors": {
+      "TikTok": "bg-neutral-900 border border-neutral-700 text-pink-400",
+      "Shopee": "bg-orange-950/40 border border-orange-500/30 text-orange-400",
+      "Tokopedia": "bg-emerald-950/40 border border-emerald-500/30 text-emerald-400",
+      "WhatsApp": "bg-green-950/40 border border-green-500/30 text-green-400",
+      "Meta": "bg-blue-950/40 border border-blue-500/30 text-blue-400",
+      "Lazada": "bg-indigo-950/40 border border-indigo-500/30 text-indigo-400",
+      "Website": "bg-purple-950/40 border border-purple-500/30 text-purple-400",
+      "Offline": "bg-slate-800 border border-slate-600 text-slate-300"
+    }
+  },
+  "layout_and_spacing": {
+    "grid_system": "MODE B: High Density Dashboard Grid (Density, Scannability & Instant Action)",
+    "padding_rules": "Cards & containers MUST have p-5 or p-6 to avoid content crowding. Use gap-4 to gap-6 for dashboard widgets.",
+    "alignment_rules": "Data metrics right-aligned or crisp left-aligned with monospace numbers. Navigation sticky top z-50 with backdrop blur (backdrop-blur-xl bg-slate-950/80 border-b border-slate-800).",
+    "mobile_rules": "Grid items stack on mobile (grid-cols-1 md:grid-cols-2 lg:grid-cols-4). Dynamic tables wrap with horizontal scroll and clean indicators."
+  },
+  "components_structure": {
+    "navigation_bar": {
+      "component": "TopNavbar",
+      "features": ["Company Switcher", "Monthly KPI Target Status Badge", "Quick Add Daily Input CTA", "7-Step Wizard Trigger", "Dark/Light Toggle"],
+      "test_id": "top-navbar"
+    },
+    "onboarding_wizard": {
+      "component": "KpiOnboardingWizardModal",
+      "steps": [
+        "Step 1: Profil Perusahaan (Nama Toko/UMKM, Category, Period)",
+        "Step 2: Target Penjualan Bulanan (Total Sales target, multi-channel share)",
+        "Step 3: Budget Ads (Meta Ads, TikTok Ads, Shopee Ads, Tokopedia Ads)",
+        "Step 4: Budget Branding (Awareness, Consideration, Activation, Clipper)",
+        "Step 5: Budget Campaign (Promo Diskon, Voucher, Tanggal Kembar)",
+        "Step 6: Budget KOL & Target (Total budget, target jumlah KOL micro/macro)",
+        "Step 7: Target Live Streaming (Jumlah tim, target jam live, target omzet live)"
+      ],
+      "test_id": "kpi-onboarding-wizard"
+    },
+    "daily_input_module": {
+      "component": "DailyDataInputForm",
+      "features": [
+        "Dynamic 1-to-many Multi-Akun per platform (e.g., Toko Tiktok Official, Toko Tiktok Affiliate 1, Shopee Official, WA Sales Admin 1)",
+        "Penjualan Tracker (Omnichannel)",
+        "Ads Tracker (Budget Keluar, Revenue Omzet, CPA, ROI calculation auto)",
+        "Branding Tracker (Awareness, Consideration, Offline Event, Buzzer/Clipper)",
+        "Campaign Tracker (Nama Campaign, Durasi, Spend)",
+        "Live Streaming Log Team Granular (Nama Streamer, Jam Mulai, Jam Selesai, Omzet Harian)",
+        "KOL Activation Tracker (KOL Name, Rate card, Target vs Realisasi Reach/Sales)"
+      ],
+      "test_id": "daily-data-input-module"
+    },
+    "visual_dashboard": {
+      "component": "AnalyticsDashboardView",
+      "widgets": [
+        "Summary Cards: Target Bulanan vs Prorate Harian, Time Elapsed vs KPI Achieved %",
+        "Prorate Target Gauge & Progress Indicator (Positive/Negative % with green/red badges)",
+        "Sales Trend Chart (Recharts ResponsiveContainer: Multi-channel breakdown)",
+        "Ads ROI & CPA Efficiency Chart (Recharts Bar/Line composite)",
+        "Live Streaming Performance Grid (Granular Streamer Log + Daily Revenue)",
+        "KOL Budgeting vs Realization Matrix"
+      ],
+      "test_id": "analytics-dashboard-view"
+    },
+    "ai_recommendation_panel": {
+      "component": "AiAnalysisModalPanel",
+      "trigger": "Button 'Analisa AI KPI Red Alert' with glowing amber/red state when sub-target is underperforming",
+      "features": [
+        "Root cause breakdown for Red KPIs (e.g. CPA TikTok Ads spikes > 35%, Live streaming duration down 2.5 hrs)",
+        "Actionable Step-by-Step Fixes for Marketplace Sellers (e.g. Shift 20% budget from Meta to Shopee Search Ads, change live streamer peak hour slot)",
+        "AI Confidence score & expected revenue recovery calculation"
+      ],
+      "test_id": "ai-analysis-panel"
+    }
+  },
+  "image_urls": [
+    {
+      "category": "indonesian_seller_team",
+      "url": "https://images.unsplash.com/photo-1774600134168-b9ebd714e4e1?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHw0fHxpbmRvbmVzaWFuJTIwZW50cmVwcmVuZXVyJTIwYnVzaW5lc3MlMjB0ZWFtJTIwZGF0YSUyMGFuYWx5dGljc3xlbnwwfHx8fDE3OTE4ODMzMzF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Indonesian business team collaborating on marketplace seller strategy"
+    },
+    {
+      "category": "live_streaming_team",
+      "url": "https://images.unsplash.com/photo-1754531976828-69e42ce4e0d9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHwyfHxpbmRvbmVzaWFuJTIwZW50cmVwcmVuZXVyJTIwYnVzaW5lc3MlMjB0ZWFtJTIwZGF0YSUyMGFuYWx5dGljc3xlbnwwfHx8fDE3OTE4ODMzMzF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "E-commerce operation meeting & team performance tracking"
+    },
+    {
+      "category": "seller_dashboard_user",
+      "url": "https://images.unsplash.com/photo-1621857093087-7daa85ab14a6?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTV8MHwxfHNlYXJjaHwzfHxpbmRvbmVzaWFuJTIwZW50cmVwcmVuZXVyJTIwYnVzaW5lc3MlMjB0ZWFtJTIwZGF0YSUyMGFuYWx5dGljc3xlbnwwfHx8fDE3OTE4ODMzMzF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Seller checking daily store revenue and ads performance"
+    }
+  ],
+  "accessibility_and_testing": {
+    "data_testid_convention": "All interactive inputs, buttons, steps, modals, charts, and metric displays MUST include kebab-case `data-testid` attributes.",
+    "key_test_ids": [
+      "top-navbar",
+      "onboarding-wizard-trigger-button",
+      "onboarding-wizard-step-1-company",
+      "onboarding-wizard-step-2-sales",
+      "onboarding-wizard-step-3-ads",
+      "onboarding-wizard-step-4-branding",
+      "onboarding-wizard-step-5-campaign",
+      "onboarding-wizard-step-6-kol",
+      "onboarding-wizard-step-7-livestream",
+      "daily-input-platform-select",
+      "daily-input-add-account-button",
+      "daily-input-submit-button",
+      "dashboard-prorate-metric-card",
+      "dashboard-time-vs-kpi-tracker",
+      "dashboard-sales-chart",
+      "dashboard-ads-roi-chart",
+      "dashboard-live-stream-log-table",
+      "ai-analysis-trigger-button",
+      "ai-analysis-recommendations-list"
+    ]
+  },
+  "instructions_to_main_agent": [
+    "Build a production-ready, highly interactive dashboard application in standard Javascript/React (.js files) with Tailwind CSS, Lucide icons, and Recharts.",
+    "Implement mock state management so user inputs in Onboarding Wizard (7 steps) and Daily Data Input forms dynamically update the Dashboard Metrics, Charts, and Red KPI Status instantly.",
+    "Provide initial pre-populated realistic Indonesian UMKM seller dataset (e.g. Toko Fashion Batik Nusantara / Skincare Glow Seller with TikTok, Shopee, Tokopedia, Meta Ads, Live Streaming team log) so the dashboard looks rich and full immediately upon load.",
+    "Implement the 'Analisa AI' drawer/modal with realistic AI prompt simulation that reads current red KPIs and generates structured, highly contextual Indonesian marketplace seller advice.",
+    "Ensure dark mode aesthetic with crisp slate/dark indigo backgrounds, glowing emerald status indicators, clear border framing, and responsive layout for mobile and desktop."
+  ]
+}
