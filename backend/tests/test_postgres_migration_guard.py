@@ -57,6 +57,20 @@ class MigrationGuardTests(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     migrate.validate_migration_target(direction, "staging", actual, confirmed, configured)
 
+    def test_production_up_requires_explicit_flag_and_exact_non_test_target(self):
+        migrate.validate_migration_target("up", "production", "satsetdi_sampe", "satsetdi_sampe",
+                                          "satsetdi_sampe", True)
+        for direction, actual, confirmed, configured, allowed in (
+            ("up", "satsetdi_sampe", "satsetdi_sampe", "satsetdi_sampe", False),
+            ("down", "satsetdi_sampe", "satsetdi_sampe", "satsetdi_sampe", True),
+            ("up", "sampe_test", "sampe_test", "sampe_test", True),
+            ("up", "other_sampe", "satsetdi_sampe", "satsetdi_sampe", True),
+        ):
+            with self.subTest(direction=direction, actual=actual, allowed=allowed):
+                with self.assertRaises(RuntimeError):
+                    migrate.validate_migration_target(direction, "production", actual, confirmed,
+                                                      configured, allowed)
+
     def test_all_created_tables_are_named_in_rollback(self):
         up = (POSTGRES_DIR / "migrations" / "0001_initial.up.sql").read_text(encoding="utf-8")
         down = (POSTGRES_DIR / "migrations" / "0001_initial.down.sql").read_text(encoding="utf-8")

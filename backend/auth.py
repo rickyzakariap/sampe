@@ -14,7 +14,7 @@ from core import db, DB_BACKEND
 from license_rules import (_now, _parse, license_status, public_license,
                            activate_fields, extend_fields, new_license,
                            generate_license_code)
-from lynk_contract import renew_url
+from lynk_contract import renew_url, valid_buyer_email
 
 JWT_ALGORITHM = "HS256"
 DURATIONS = (1, 7, 30, 365)
@@ -342,6 +342,15 @@ async def init_auth():
     await db.login_attempts.create_index("identifier")
     await db.kpi_config.create_index([("tenant_id", 1), ("month", 1)])
     await db.entries.create_index([("tenant_id", 1), ("date", 1)])
+    if DB_BACKEND == "postgres":
+        if await db.users.find_one({"role": "admin"}):
+            return
+        email = os.environ.get("ADMIN_EMAIL", "").strip().lower()
+        pwd = os.environ.get("ADMIN_PASSWORD", "")
+        if not valid_buyer_email(email) or len(pwd) < 12:
+            raise RuntimeError("First admin requires a valid ADMIN_EMAIL and ADMIN_PASSWORD of at least 12 characters")
+        await db.bootstrap_admin(email, hash_password(pwd), str(uuid.uuid4()), _now().isoformat())
+        return
     email = os.environ["ADMIN_EMAIL"].strip().lower()
     pwd = os.environ["ADMIN_PASSWORD"]
     existing = await db.users.find_one({"email": email})

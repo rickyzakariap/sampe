@@ -1,4 +1,4 @@
-"""Apply SAMPE schema migrations to an explicitly named test or staging DB.
+"""Apply SAMPE schema migrations to an explicitly named database.
 
 This module is deliberately not imported by the MongoDB application runtime.
 """
@@ -30,9 +30,16 @@ def validate_test_target(environment: str, actual_database: str, confirmed_datab
 
 
 def validate_migration_target(direction: str, environment: str, actual_database: str,
-                              confirmed_database: str, configured_database: str | None) -> None:
+                              confirmed_database: str, configured_database: str | None,
+                              allow_production: bool = False) -> None:
     if environment == "testing":
         validate_test_target(environment, actual_database, confirmed_database)
+        return
+    if environment == "production":
+        if (direction != "up" or not allow_production or not configured_database
+                or actual_database != confirmed_database or configured_database != confirmed_database
+                or re.search(r"(^|[_-])(test|testing|stag|staging)($|[_-])", actual_database, re.IGNORECASE)):
+            raise RuntimeError("Production migration requires UP, --allow-production, and an exact non-test database target")
         return
     if direction != "up" or environment != "staging":
         raise RuntimeError("Only migration UP is allowed on staging; production is not supported by this runner")
@@ -42,14 +49,15 @@ def validate_migration_target(direction: str, environment: str, actual_database:
         raise RuntimeError("The database name must identify an isolated staging database")
 
 
-def migrate(direction: str, confirmed_database: str) -> None:
+def migrate(direction: str, confirmed_database: str, allow_production: bool = False) -> None:
     dsn = os.environ.get("SAMPE_POSTGRES_DSN")
     if not dsn:
         raise RuntimeError("SAMPE_POSTGRES_DSN is required")
     environment = os.environ.get("SAMPE_POSTGRES_ENV", "")
     configured_database = os.environ.get("SAMPE_POSTGRES_TARGET_DB")
     # Refuse an unlabeled target before even opening a database connection.
-    validate_migration_target(direction, environment, confirmed_database, confirmed_database, configured_database)
+    validate_migration_target(direction, environment, confirmed_database, confirmed_database,
+                              configured_database, allow_production)
     versions = migration_versions()
     completed = []
 
@@ -60,10 +68,18 @@ def migrate(direction: str, confirmed_database: str) -> None:
     with psycopg.connect(dsn, connect_timeout=5) as conn:
         with conn.transaction():
             actual_database = conn.execute("SELECT current_database()").fetchone()[0]
-            validate_migration_target(direction, environment, actual_database, confirmed_database, configured_database)
+            validate_migration_target(direction, environment, actual_database, confirmed_database,
+                                      configured_database, allow_production)
             conn.execute("SET LOCAL lock_timeout = '5s'")
             conn.execute("SET LOCAL statement_timeout = '30s'")
             conn.execute("SELECT pg_advisory_xact_lock(hashtext('sampe_schema_migrations'))")
+            if environment == "production":
+                existing_tables = conn.execute(
+                    "SELECT 1 FROM pg_catalog.pg_tables "
+                    "WHERE schemaname NOT IN ('pg_catalog', 'information_schema') LIMIT 1"
+                ).fetchone()
+                if existing_tables:
+                    raise RuntimeError("Production migration requires an empty database")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS public.sampe_schema_migrations (
                     version text PRIMARY KEY,
@@ -96,11 +112,12 @@ def migrate(direction: str, confirmed_database: str) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="SAMPE PostgreSQL test or staging schema migrations")
+    parser = argparse.ArgumentParser(description="SAMPE PostgreSQL schema migrations")
     parser.add_argument("direction", choices=("up", "down"))
-    parser.add_argument("--confirm-db", required=True, help="Exact name of the isolated test or staging database")
+    parser.add_argument("--confirm-db", required=True, help="Exact connected database name")
+    parser.add_argument("--allow-production", action="store_true", help="Allow UP on an empty, exactly named production database")
     args = parser.parse_args()
-    migrate(args.direction, args.confirm_db)
+    migrate(args.direction, args.confirm_db, args.allow_production)
 
 
 if __name__ == "__main__":

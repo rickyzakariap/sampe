@@ -320,6 +320,24 @@ class PgDatabase:
             cursor = await conn.execute(sql, args)
             return cursor.rowcount
 
+    async def bootstrap_admin(self, email, password_hash, admin_id, created_at):
+        """Create the first admin once, serialized across Passenger workers."""
+        async with await self.connect() as conn:
+            async with conn.transaction():
+                await conn.execute("SELECT pg_advisory_xact_lock(hashtext('sampe_first_admin'))")
+                existing = await conn.execute("SELECT 1 FROM sampe.users WHERE role='admin' LIMIT 1")
+                if await existing.fetchone():
+                    return False
+                duplicate = await conn.execute("SELECT 1 FROM sampe.users WHERE email=%s", (email,))
+                if await duplicate.fetchone():
+                    raise RuntimeError("Admin bootstrap email already belongs to another account")
+                await conn.execute(
+                    "INSERT INTO sampe.users (id,email,password_hash,name,role,created_at) "
+                    "VALUES (%s,%s,%s,'Admin','admin',%s)",
+                    (admin_id, email, password_hash, created_at),
+                )
+                return True
+
     async def save_kpi_config(self, document):
         """One statement preserves the existing config identity on updates."""
         keys = [key for key in document if key in TABLES["kpi_config"][1]]

@@ -95,3 +95,21 @@ database using synthetic identities and payment fixtures. The live OAuth
 provider, live Lynk delivery, external AI integration, and frontend browser
 are outside this local test. Production enablement, customer-data migration,
 and deployment require separate approval and validation.
+
+## Fresh production database preparation
+
+Use only the empty, dedicated `satsetdi_sampe` database after its private user
+and DSN are configured. Verify its identity and emptiness before running:
+
+```text
+SAMPE_POSTGRES_ENV=production
+SAMPE_POSTGRES_TARGET_DB=satsetdi_sampe
+SAMPE_POSTGRES_DSN=<private DSN; never store in Git>
+python backend/postgres/migrate.py up --confirm-db satsetdi_sampe --allow-production
+```
+
+The runner checks the connected database name and refuses production DOWN or
+any existing user tables. It creates the empty SAMPE schema only. The first
+admin is provisioned at application startup from private `ADMIN_EMAIL` and
+`ADMIN_PASSWORD` values (at least 12 characters), only when no admin exists;
+later restarts never reset that password. `JWT_SECRET` is also required.
