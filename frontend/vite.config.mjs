@@ -85,6 +85,7 @@ export default defineConfig(async ({ mode, command }) => {
       .map(([key, value]) => [`process.env.${key}`, JSON.stringify(value)]),
   );
   define["process.env.REACT_APP_BACKEND_URL"] = JSON.stringify(env.REACT_APP_BACKEND_URL || "");
+  define["process.env.REACT_APP_ADMIN_PATH"] = JSON.stringify(env.REACT_APP_ADMIN_PATH || "/admin");
   return {
     plugins: [
       // Visual-edit tagging is dev-server-only, matching the package's own apply: serve.

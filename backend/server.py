@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, date
 
-from core import db, client, EMERGENT_LLM_KEY, now_iso, Entry, EntryInput, shift_month
+from core import db, client, DB_BACKEND, EMERGENT_LLM_KEY, now_iso, Entry, EntryInput, shift_month
 from onboarding import router as onboarding_router
 from auth import router as auth_router, get_tenant, require_write, init_auth
 from lynk import router as lynk_router
@@ -15,6 +15,19 @@ from fastapi import Depends
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+
+@api_router.get("/health")
+async def health():
+    try:
+        if DB_BACKEND == "postgres":
+            await db.query("SELECT 1")
+        else:
+            await db.command("ping")
+    except Exception as exc:
+        logging.warning("Database health check failed: %s", type(exc).__name__)
+        raise HTTPException(503, "Service unavailable") from None
+    return {"status": "ok"}
 
 
 # ---------------- Helpers ----------------
@@ -383,6 +396,8 @@ app.include_router(lynk_router)
 
 @app.on_event("startup")
 async def startup():
+    if DB_BACKEND == "postgres":
+        await db.validate_target()
     await init_auth()
 
 app.add_middleware(

@@ -1,146 +1,32 @@
 """Integrasi Lynk.id: webhook order paid -> lisensi otomatis, halaman aktivasi, pengaturan admin."""
-import hashlib
-import hmac
 import json
 import logging
-import math
-import re
-from datetime import datetime, timedelta, timezone
-from email.utils import parseaddr
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from pymongo.errors import DuplicateKeyError, PyMongoError
+from core import db, DB_BACKEND
+if DB_BACKEND == "mongo":
+    from pymongo.errors import DuplicateKeyError, PyMongoError
+else:
+    class PyMongoError(Exception):
+        pass
 
-from core import db
+    class DuplicateKeyError(PyMongoError):
+        pass
 from auth import (get_admin, new_license, new_code, public_license, license_status,
                   check_lock, record_fail, client_ip)
+from license_rules import renewal_expires_at
+from lynk_contract import (SAMPE_PRODUCT, SAMPE_PRODUCT_DAYS, valid_buyer_email,
+                           parse_payload, signature_amount, signature_ok, product_days)
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger("lynk")
-SAMPE_PRODUCT = "SAMPE - System Analytic Marketplace"
-SAMPE_PRODUCT_DAYS = {
-    SAMPE_PRODUCT.casefold(): 1,
-    f"{SAMPE_PRODUCT} (7 Hari)".casefold(): 7,
-    f"{SAMPE_PRODUCT} (30 Hari)".casefold(): 30,
-    f"{SAMPE_PRODUCT} (365 Hari)".casefold(): 365,
-}
-
-
-def valid_buyer_email(value: str) -> bool:
-    if not value or len(value) > 254 or any(char.isspace() for char in value):
-        return False
-    if parseaddr(value)[1] != value:
-        return False
-    local, separator, domain = value.rpartition("@")
-    if not separator or not local or len(local) > 64 or "." not in domain:
-        return False
-    if not (local.startswith('"') and local.endswith('"')):
-        atoms = local.split(".")
-        if any(not atom or any(not (char.isalnum() or char in "!#$%&'*+/=?^_`{|}~-") for char in atom) for atom in atoms):
-            return False
-    try:
-        labels = domain.encode("idna").decode("ascii").split(".")
-    except UnicodeError:
-        return False
-    return all(len(label) <= 63 and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label) for label in labels)
 
 
 async def lynk_settings() -> dict:
     return await db.settings.find_one({"key": "lynk"}, {"_id": 0}) or {"key": "lynk"}
-
-
-def _pick(d: dict, *keys):
-    for k in keys:
-        if isinstance(d, dict) and d.get(k) not in (None, ""):
-            return d[k]
-    return None
-
-
-def parse_payload(body: dict) -> dict:
-    if not isinstance(body, dict):
-        raise ValueError("Payload bukan objek")
-    data = body.get("data") or {}
-    if not isinstance(data, dict):
-        raise ValueError("Data bukan objek")
-    md = data.get("message_data") or {}
-    if not isinstance(md, dict):
-        raise ValueError("Message data bukan objek")
-    cust = md.get("customer") or {}
-    totals = md.get("totals") or {}
-    items = md.get("items") or []
-    if not isinstance(cust, dict) or not isinstance(totals, dict) or not isinstance(items, list):
-        raise ValueError("Struktur transaksi tidak valid")
-    parsed_items = []
-    for item in items:
-        if not isinstance(item, dict):
-            raise ValueError("Item bukan objek")
-        try:
-            qty = int(item.get("qty", 1))
-        except (TypeError, ValueError) as exc:
-            raise ValueError("Kuantitas item tidak valid") from exc
-        if qty < 1:
-            raise ValueError("Kuantitas item tidak valid")
-        parsed_items.append({"title": str(item.get("title") or item.get("name") or ""), "qty": qty})
-    return {
-        "ref_id": str(_pick(md, "refId", "ref_id", "order_id") or "").strip(),
-        "message_id": str(_pick(data, "message_id", "messageId") or "").strip(),
-        "email": str(_pick(cust, "email") or _pick(md, "email") or "").strip().lower(),
-        "name": str(_pick(cust, "name") or _pick(md, "name") or ""),
-        "phone": str(_pick(cust, "phone") or ""),
-        "items": parsed_items,
-        "grand_total": totals.get("grandTotal"),
-        "event": body.get("event"),
-        "message_action": data.get("message_action"),
-        "message_code": data.get("message_code"),
-    }
-
-
-def signature_amount(value) -> Optional[str]:
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        try:
-            if not math.isfinite(value):
-                return None
-            return str(int(value)) if value == int(value) else str(value)
-        except (OverflowError, ValueError):
-            return None
-    if isinstance(value, str):
-        return value.strip() or None
-    return None
-
-
-def signature_ok(p: dict, sig: str, key: str) -> bool:
-    amount = signature_amount(p["grand_total"])
-    if not sig or amount is None or not p["ref_id"] or not p["message_id"] or not key:
-        return False
-    expected = hashlib.sha256(f"{amount}{p['ref_id']}{p['message_id']}{key}".encode()).hexdigest()
-    return hmac.compare_digest(expected, sig.strip().lower())
-
-
-def product_days(items: list[dict]) -> tuple[int, bool]:
-    days = 0
-    includes_sampe = False
-    for item in items:
-        title = item["title"].strip()
-        duration = SAMPE_PRODUCT_DAYS.get(title.casefold())
-        if duration is not None:
-            days += duration * item["qty"]
-            includes_sampe = True
-    return days, includes_sampe
-
-
-def renewal_expires_at(lic: dict, days: int, success_time: datetime) -> str:
-    existing = lic["expires_at"]
-    if isinstance(existing, str):
-        existing = datetime.fromisoformat(existing)
-    if not isinstance(existing, datetime):
-        raise ValueError("Tanggal kedaluwarsa lisensi tidak valid")
-    if existing.tzinfo is None:
-        existing = existing.replace(tzinfo=timezone.utc)
-    return (max(existing, success_time) + timedelta(days=days)).isoformat()
 
 
 async def grant_license(email: str, name: str, days: int, ref_id: str, session) -> tuple[Optional[dict], str]:
@@ -206,6 +92,11 @@ async def lynk_webhook(request: Request):
     try:
         order, duplicate = await process_order(p)
     except Exception as exc:
+        if DB_BACKEND == "postgres":
+            from postgres.access import PolicyDecisionRequired
+            if isinstance(exc, PolicyDecisionRequired):
+                await _log("pending_policy", "Renewal lisensi dicabut menunggu keputusan", request, p["ref_id"])
+                raise HTTPException(409, "Order memerlukan keputusan kebijakan lisensi")
         log.error("Lynk order transaction failed: %s", type(exc).__name__)
         await _log("failed", "Transaksi database gagal", request, p["ref_id"])
         raise HTTPException(503, "Order gagal diproses sementara; aman untuk retry")
@@ -217,6 +108,11 @@ async def lynk_webhook(request: Request):
 
 
 async def process_order(p: dict) -> tuple[dict, bool]:
+    if DB_BACKEND == "postgres":
+        from starlette.concurrency import run_in_threadpool
+        from postgres.access import PostgresAccess
+        result = await run_in_threadpool(PostgresAccess(db.dsn)._process_order, p)
+        return result, result["duplicate"]
     days, _ = product_days(p["items"])
     order = {"ref_id": p["ref_id"], "message_id": p["message_id"], "email": p["email"], "name": p["name"], "phone": p["phone"],
              "product": ", ".join(i["title"] for i in p["items"]), "days": days,

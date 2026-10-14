@@ -1,6 +1,5 @@
 """Auth: Google (Emergent) untuk user + lisensi per akun, admin email/password, manajemen lisensi."""
 import os
-import secrets
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -11,28 +10,19 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
-from core import db
+from core import db, DB_BACKEND
+from license_rules import (_now, _parse, license_status, public_license,
+                           activate_fields, extend_fields, new_license,
+                           generate_license_code)
 
 JWT_ALGORITHM = "HS256"
 DURATIONS = (1, 7, 30, 365)
 MAX_FAILS = 5
 LOCK_MINUTES = 15
 SESSION_DAYS = 7
-CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 EMERGENT_SESSION_URL = "https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data"
 
 router = APIRouter(prefix="/api")
-
-
-def _now():
-    return datetime.now(timezone.utc)
-
-
-def _parse(s):
-    if not s:
-        return None
-    d = datetime.fromisoformat(s) if isinstance(s, str) else s
-    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
 
 
 def hash_password(p: str) -> str:
@@ -43,42 +33,11 @@ def verify_password(p: str, h: str) -> bool:
     return bcrypt.checkpw(p.encode(), h.encode())
 
 
-def license_status(lic: dict) -> str:
-    if lic.get("revoked"):
-        return "revoked"
-    if not lic.get("activated_at"):
-        return "unused"
-    return "active" if _parse(lic["expires_at"]) > _now() else "expired"
-
-
-def public_license(lic: dict) -> dict:
-    keys = ("id", "code", "label", "email", "source", "duration_days", "created_at", "activated_at", "expires_at", "last_login_at", "revoked")
-    return {k: lic.get(k) for k in keys} | {"status": license_status(lic)}
-
-
-def activate_fields(lic: dict) -> dict:
-    now = _now()
-    return {"activated_at": now.isoformat(), "expires_at": (now + timedelta(days=lic["duration_days"])).isoformat()}
-
-
-def extend_fields(lic: dict, days: int) -> dict:
-    if not lic.get("activated_at"):
-        return {"duration_days": lic["duration_days"] + days}
-    base = max(_parse(lic["expires_at"]), _now())
-    return {"expires_at": (base + timedelta(days=days)).isoformat()}
-
-
 async def new_code() -> str:
     while True:
-        code = "SAMPE-" + "-".join("".join(secrets.choice(CODE_ALPHABET) for _ in range(4)) for _ in range(3))
+        code = generate_license_code()
         if not await db.licenses.find_one({"code": code}):
             return code
-
-
-def new_license(label: str, days: int, email: Optional[str] = None, source: str = "admin") -> dict:
-    return {"id": str(uuid.uuid4()), "code": None, "label": label, "email": (email or "").strip().lower() or None,
-            "source": source, "duration_days": days, "created_at": _now().isoformat(), "activated_at": None,
-            "expires_at": None, "last_login_at": None, "revoked": False, "owner_user_id": None}
 
 
 # ---------------- Session helpers ----------------
@@ -146,6 +105,9 @@ async def check_lock(ident: str):
 
 
 async def record_fail(ident: str):
+    if DB_BACKEND == "postgres":
+        await db.record_login_failure(ident, MAX_FAILS, LOCK_MINUTES)
+        return
     rec = await db.login_attempts.find_one_and_update({"identifier": ident}, {"$inc": {"count": 1}}, upsert=True, return_document=True)
     if rec and rec.get("count", 0) >= MAX_FAILS:
         await db.login_attempts.update_one({"identifier": ident}, {"$set": {
@@ -189,6 +151,14 @@ async def google_session(payload: SessionIn, response: Response):
         raise HTTPException(401, "Login Google gagal, coba lagi")
     data = r.json()
     email = data["email"].strip().lower()
+    if DB_BACKEND == "postgres":
+        from postgres.access import PostgresAccess
+        from starlette.concurrency import run_in_threadpool
+        token = data["session_token"]
+        await run_in_threadpool(PostgresAccess(db.dsn).start_session, email, data.get("name") or "",
+                                token, picture=data.get("picture"))
+        response.set_cookie("session_token", token, httponly=True, secure=True, samesite="none", path="/", max_age=SESSION_DAYS * 86400)
+        return {"session_token": token}
     m = await db.members.find_one({"email": email}, {"_id": 0})
     if m:
         await db.members.update_one({"user_id": m["user_id"]}, {"$set": {"name": data.get("name"), "picture": data.get("picture")}})
@@ -207,6 +177,14 @@ async def google_session(payload: SessionIn, response: Response):
 
 @router.get("/auth/me")
 async def me(member: dict = Depends(get_member)):
+    if DB_BACKEND == "postgres":
+        from postgres.access import PostgresAccess
+        from starlette.concurrency import run_in_threadpool
+        lic = await run_in_threadpool(PostgresAccess(db.dsn).ensure_member_license, member["user_id"])
+        s = await db.settings.find_one({"key": "lynk"}, {"_id": 0}) or {}
+        return {"user": {k: member.get(k) for k in ("user_id", "email", "name", "picture")},
+                "license": public_license(lic) if lic else None,
+                "writable": bool(lic) and license_status(lic) == "active", "renew_url": s.get("renew_url")}
     lic = await license_of(member) or await auto_bind(member)
     if lic:
         await db.licenses.update_one({"id": lic["id"]}, {"$set": {"last_login_at": _now().isoformat()}})
@@ -221,6 +199,18 @@ async def me(member: dict = Depends(get_member)):
 async def claim(payload: ClaimIn, request: Request, member: dict = Depends(get_member)):
     ident = f"claim:{client_ip(request)}"
     await check_lock(ident)
+    if DB_BACKEND == "postgres":
+        from postgres.access import PostgresAccess
+        from starlette.concurrency import run_in_threadpool
+        try:
+            lic = await run_in_threadpool(PostgresAccess(db.dsn).claim_license, member["user_id"], payload.code)
+        except PermissionError:
+            raise HTTPException(409, "Kode ini sudah terhubung ke akun Google lain")
+        except ValueError:
+            await record_fail(ident)
+            raise HTTPException(404, "Kode lisensi tidak valid atau sudah dicabut")
+        await db.login_attempts.delete_one({"identifier": ident})
+        return public_license(lic)
     lic = await db.licenses.find_one({"code": payload.code.strip().upper()}, {"_id": 0})
     if not lic or lic.get("revoked"):
         await record_fail(ident)
@@ -311,6 +301,13 @@ async def create_license(payload: LicenseCreate, _: dict = Depends(get_admin)):
 @router.post("/admin/licenses/{lid}/extend")
 async def extend_license(lid: str, payload: LicenseExtend, _: dict = Depends(get_admin)):
     _check_duration(payload.days)
+    if DB_BACKEND == "postgres":
+        from postgres.access import PostgresAccess
+        from starlette.concurrency import run_in_threadpool
+        lic = await run_in_threadpool(PostgresAccess(db.dsn).extend_admin_license, lid, payload.days)
+        if not lic:
+            raise HTTPException(404, "Lisensi tidak ditemukan")
+        return public_license(lic)
     lic = await _get_lic(lid)
     upd = extend_fields(lic, payload.days)
     await db.licenses.update_one({"id": lid}, {"$set": upd})

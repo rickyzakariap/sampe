@@ -13,6 +13,10 @@ import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+BACKEND_DIR = Path(__file__).parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 
 class HTTPException(Exception):
     def __init__(self, status_code, detail):
@@ -196,6 +200,7 @@ class LynkOfflineTests(unittest.TestCase):
         pymongo.errors = errors
         core = types.ModuleType("core")
         core.db = self.database
+        core.DB_BACKEND = "mongo"
         auth = types.ModuleType("auth")
         auth.get_admin = lambda: {"role": "admin"}
         auth.new_license = lambda name, days, email, source: {
