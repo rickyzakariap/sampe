@@ -6,9 +6,22 @@ file activates PostgreSQL, changes Lynk, or deploys the application.
 ## Host decision before deployment
 
 The current WarnaHost cPanel exposes PostgreSQL and Application Manager using
-Phusion Passenger. Its Python instructions describe WSGI; persistent ASGI
-support for this account is unverified. Do not register this FastAPI app there
-as a WSGI application. Keep WarnaHost as the proposed static frontend host.
+Phusion Passenger. The `backend/passenger_wsgi.py` adapter runs the existing
+FastAPI app through `a2wsgi.ASGIMiddleware`; local WSGI smoke tests cover
+PostgreSQL startup and `/api/health`. Passenger execution on this account is
+still unverified. No isolated staging domain is registered in cPanel, so do
+not register the app on the production SAMPE domain for a smoke test.
+
+For an approved WarnaHost deployment, set the application path to `backend/`
+and the Passenger Python startup file to `passenger_wsgi.py` with callable
+`application`. Install `backend/requirements.txt` into the Python environment
+selected by the host. The entrypoint calls the application's startup before
+serving requests and rejects non-PostgreSQL configuration. Confirm the account
+offers a compatible Python version, a private way to inject the variables
+below, and usable application logs before registration. The current cPanel
+registration form does not expose environment variable fields; a host-supported
+private configuration method is required. Do not put secrets in the source,
+document root, frontend bundle, or Passenger startup file.
 
 One compatible backend option is a Render Python web service. Render documents
 FastAPI with Uvicorn and lists its smallest paid web-service compute at
@@ -85,9 +98,9 @@ checks before any production release. Production schema application and any
 customer-data migration require a separate reviewed procedure and approval;
 do not point staging settings at an existing production database.
 
-The Lynk store URL is `https://lynk.id/katalogsat`. The application does not
-hard-code the store URL: the purchase button uses the `renew_url` saved in
-SAMPE Admin. Before release, inspect that setting and preserve any valid
+The Lynk store URL is `https://lynk.id/katalogsatset`. The purchase button
+uses the `renew_url` saved in SAMPE Admin; an empty value falls back to this
+store URL. Before release, inspect the saved setting and preserve any valid
 product-specific URL. A changed store URL alone does not imply a new Merchant
 Key. Do not alter the Lynk webhook or Merchant Key before a reviewed cutover.
 
@@ -95,7 +108,7 @@ Retain and back up the existing MongoDB data. An empty PostgreSQL schema does
 not contain old accounts, orders, or licenses. Any customer-data move, count
 reconciliation, and production cutover need a separate approved procedure.
 
-Before deployment, confirm the chosen host provides a persistent ASGI process,
-HTTPS reverse proxy, PostgreSQL connectivity, private environment variables,
+Before deployment, confirm the chosen host runs this WSGI adapter persistently,
+provides HTTPS, PostgreSQL connectivity, private environment variables,
 application logs, and backups. These capabilities are not assumed from the
 presence of a hosting account.

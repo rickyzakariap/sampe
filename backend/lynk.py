@@ -19,7 +19,7 @@ from auth import (get_admin, new_license, new_code, public_license, license_stat
                   check_lock, record_fail, client_ip)
 from license_rules import renewal_expires_at
 from lynk_contract import (SAMPE_PRODUCT, SAMPE_PRODUCT_DAYS, valid_buyer_email,
-                           parse_payload, signature_amount, signature_ok, product_days)
+                           parse_payload, signature_amount, signature_ok, product_days, renew_url)
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger("lynk")
@@ -186,7 +186,7 @@ class SettingsIn(BaseModel):
 async def get_lynk(_: dict = Depends(get_admin)):
     s = await lynk_settings()
     key = s.get("merchant_key") or ""
-    return {"merchant_key_set": bool(key), "merchant_key_hint": f"…{key[-4:]}" if key else None, "renew_url": s.get("renew_url"), "default_days": s.get("default_days")}
+    return {"merchant_key_set": bool(key), "merchant_key_hint": f"…{key[-4:]}" if key else None, "renew_url": renew_url(s.get("renew_url")), "default_days": s.get("default_days")}
 
 
 @router.put("/admin/lynk")

@@ -54,7 +54,7 @@ export const LynkSettings = () => {
         <div className="space-y-1.5"><Label className="text-xs text-slate-400">3. Merchant Key dari Lynk</Label>
           <Input data-testid="admin-merchant-key" type="password" value={key} onChange={(e) => setKey(e.target.value)} placeholder={s?.merchant_key_set ? "Isi untuk mengganti" : "mk_live_…"} className="h-10 bg-slate-900 border-slate-700" /></div>
         <div className="space-y-1.5"><Label className="text-xs text-slate-400">Link produk untuk tombol "Perpanjang di Lynk"</Label>
-          <Input data-testid="admin-renew-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://lynk.id/akunmu/sampe" className="h-10 bg-slate-900 border-slate-700" /></div>
+          <Input data-testid="admin-renew-url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://lynk.id/katalogsatset" className="h-10 bg-slate-900 border-slate-700" /></div>
         <Button data-testid="admin-lynk-save" type="submit" disabled={busy} className="h-10 bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold">
           {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Simpan</Button>
       </form>

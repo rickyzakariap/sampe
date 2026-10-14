@@ -9,6 +9,13 @@ from typing import Optional
 
 
 SAMPE_PRODUCT = "SAMPE - System Analytic Marketplace"
+LYNK_STORE_URL = "https://lynk.id/katalogsatset"
+
+
+def renew_url(configured: Optional[str]) -> str:
+    return configured or LYNK_STORE_URL
+
+
 SAMPE_PRODUCT_DAYS = {
     SAMPE_PRODUCT.casefold(): 1,
     f"{SAMPE_PRODUCT} (7 Hari)".casefold(): 7,

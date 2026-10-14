@@ -14,6 +14,7 @@ from core import db, DB_BACKEND
 from license_rules import (_now, _parse, license_status, public_license,
                            activate_fields, extend_fields, new_license,
                            generate_license_code)
+from lynk_contract import renew_url
 
 JWT_ALGORITHM = "HS256"
 DURATIONS = (1, 7, 30, 365)
@@ -184,7 +185,7 @@ async def me(member: dict = Depends(get_member)):
         s = await db.settings.find_one({"key": "lynk"}, {"_id": 0}) or {}
         return {"user": {k: member.get(k) for k in ("user_id", "email", "name", "picture")},
                 "license": public_license(lic) if lic else None,
-                "writable": bool(lic) and license_status(lic) == "active", "renew_url": s.get("renew_url")}
+                "writable": bool(lic) and license_status(lic) == "active", "renew_url": renew_url(s.get("renew_url"))}
     lic = await license_of(member) or await auto_bind(member)
     if lic:
         await db.licenses.update_one({"id": lic["id"]}, {"$set": {"last_login_at": _now().isoformat()}})
@@ -192,7 +193,7 @@ async def me(member: dict = Depends(get_member)):
     return {"user": {k: member.get(k) for k in ("user_id", "email", "name", "picture")},
             "license": public_license(lic) if lic else None,
             "writable": bool(lic) and license_status(lic) == "active",
-            "renew_url": s.get("renew_url")}
+            "renew_url": renew_url(s.get("renew_url"))}
 
 
 @router.post("/auth/claim")
