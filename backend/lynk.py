@@ -5,7 +5,8 @@ import json
 import logging
 import math
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from email.utils import parseaddr
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -13,20 +14,37 @@ from pydantic import BaseModel, Field
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from core import db
-from auth import (get_admin, new_license, new_code, extend_fields, public_license, license_status,
+from auth import (get_admin, new_license, new_code, public_license, license_status,
                   check_lock, record_fail, client_ip)
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger("lynk")
 SAMPE_PRODUCT = "SAMPE - System Analytic Marketplace"
+SAMPE_PRODUCT_DAYS = {
+    SAMPE_PRODUCT.casefold(): 1,
+    f"{SAMPE_PRODUCT} (7 Hari)".casefold(): 7,
+    f"{SAMPE_PRODUCT} (30 Hari)".casefold(): 30,
+    f"{SAMPE_PRODUCT} (365 Hari)".casefold(): 365,
+}
 
 
-def days_from_title(title: str) -> Optional[int]:
-    t = (title or "").lower()
-    if re.search(r"\b(1|satu)\s*tahun\b", t) or re.search(r"\b365\s*hari\b", t):
-        return 365
-    m = re.search(r"\b(30|7|1)\s*hari\b", t)
-    return int(m.group(1)) if m else None
+def valid_buyer_email(value: str) -> bool:
+    if not value or len(value) > 254 or any(char.isspace() for char in value):
+        return False
+    if parseaddr(value)[1] != value:
+        return False
+    local, separator, domain = value.rpartition("@")
+    if not separator or not local or len(local) > 64 or "." not in domain:
+        return False
+    if not (local.startswith('"') and local.endswith('"')):
+        atoms = local.split(".")
+        if any(not atom or any(not (char.isalnum() or char in "!#$%&'*+/=?^_`{|}~-") for char in atom) for atom in atoms):
+            return False
+    try:
+        labels = domain.encode("idna").decode("ascii").split(".")
+    except UnicodeError:
+        return False
+    return all(len(label) <= 63 and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label) for label in labels)
 
 
 async def lynk_settings() -> dict:
@@ -107,23 +125,35 @@ def product_days(items: list[dict]) -> tuple[int, bool]:
     includes_sampe = False
     for item in items:
         title = item["title"].strip()
-        is_sampe = title.casefold() == SAMPE_PRODUCT.casefold()
-        duration = 30 if is_sampe else days_from_title(title)
-        if duration:
+        duration = SAMPE_PRODUCT_DAYS.get(title.casefold())
+        if duration is not None:
             days += duration * item["qty"]
-        includes_sampe = includes_sampe or is_sampe
+            includes_sampe = True
     return days, includes_sampe
 
 
-async def grant_license(email: str, name: str, days: int, ref_id: str, allow_extend: bool, session) -> tuple[Optional[dict], str]:
+def renewal_expires_at(lic: dict, days: int, success_time: datetime) -> str:
+    existing = lic["expires_at"]
+    if isinstance(existing, str):
+        existing = datetime.fromisoformat(existing)
+    if not isinstance(existing, datetime):
+        raise ValueError("Tanggal kedaluwarsa lisensi tidak valid")
+    if existing.tzinfo is None:
+        existing = existing.replace(tzinfo=timezone.utc)
+    return (max(existing, success_time) + timedelta(days=days)).isoformat()
+
+
+async def grant_license(email: str, name: str, days: int, ref_id: str, session) -> tuple[Optional[dict], str]:
     owner = await db.members.find_one({"email": email}, {"_id": 0, "user_id": 1}, session=session)
     q = {"revoked": False, "$or": [{"email": email}] + ([{"owner_user_id": owner["user_id"]}] if owner else [])}
     lic = await db.licenses.find_one(q, {"_id": 0}, sort=[("created_at", -1)], session=session)
     if lic:
-        if not allow_extend:
+        if not lic.get("activated_at") or not lic.get("expires_at"):
             return None, "pending_policy"
-        upd = extend_fields(lic, days)
-        await db.licenses.update_one({"id": lic["id"]}, {"$set": upd}, session=session)
+        upd = {"expires_at": renewal_expires_at(lic, days, datetime.now(timezone.utc))}
+        result = await db.licenses.update_one({"id": lic["id"], "revoked": False}, {"$set": upd}, session=session)
+        if result.matched_count != 1:
+            raise PyMongoError("Lisensi renewal tidak tersedia")
         return lic | upd, "extended"
     lic = new_license(name or email, days, email, "lynk") | {"code": await new_code(), "lynk_ref_id": ref_id}
     await db.licenses.insert_one(dict(lic), session=session)
@@ -158,7 +188,7 @@ async def lynk_webhook(request: Request):
     if p["event"] != "payment.received":
         await _log("ignored", "Event bukan payment.received", request, p["ref_id"])
         return {"ok": True, "processed": False, "reason": "event diabaikan"}
-    if not p["ref_id"] or not p["email"] or not p["message_id"] or signature_amount(p["grand_total"]) is None:
+    if not p["ref_id"] or not valid_buyer_email(p["email"]) or not p["message_id"] or signature_amount(p["grand_total"]) is None:
         await _log("rejected", "Field transaksi wajib tidak tersedia", request, p["ref_id"])
         raise HTTPException(400, "Field transaksi wajib tidak tersedia")
     key = (await lynk_settings()).get("merchant_key")
@@ -187,7 +217,7 @@ async def lynk_webhook(request: Request):
 
 
 async def process_order(p: dict) -> tuple[dict, bool]:
-    days, includes_sampe = product_days(p["items"])
+    days, _ = product_days(p["items"])
     order = {"ref_id": p["ref_id"], "message_id": p["message_id"], "email": p["email"], "name": p["name"], "phone": p["phone"],
              "product": ", ".join(i["title"] for i in p["items"]), "days": days,
              "created_at": datetime.now(timezone.utc).isoformat(), "license_id": None, "action": None,
@@ -202,7 +232,7 @@ async def process_order(p: dict) -> tuple[dict, bool]:
                     await db.lynk_email_locks.update_one(
                         {"_id": p["email"]}, {"$set": {"touched_at": datetime.now(timezone.utc).isoformat()}},
                         upsert=True, session=session)
-                    lic, action = await grant_license(p["email"], p["name"], days, p["ref_id"], not includes_sampe, session)
+                    lic, action = await grant_license(p["email"], p["name"], days, p["ref_id"], session)
                     if lic:
                         order.update({"license_id": lic["id"], "action": action, "status": "processed"})
                     else:

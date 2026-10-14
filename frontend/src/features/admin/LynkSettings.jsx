@@ -59,14 +59,14 @@ export const LynkSettings = () => {
           {busy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Save className="h-4 w-4 mr-1" />} Simpan</Button>
       </form>
       <div data-testid="admin-default-days" className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2.5">
-        <span className="text-xs text-slate-300">Durasi default jika nama produk tidak menyebut durasi:</span>
+        <span className="text-xs text-slate-300">Durasi default tersimpan (tidak digunakan webhook SAMPE):</span>
         {[[0, "Tidak ada"], [1, "1 hari"], [7, "7 hari"], [30, "30 hari"], [365, "365 hari"]].map(([d, l]) => (
           <button type="button" key={d} data-testid={`admin-default-days-${d}`} onClick={() => setDefDays(d)}
             className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${defDays === d ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>{l}</button>
         ))}
         <span className="text-[11px] text-slate-500">(klik Simpan setelah memilih)</span>
       </div>
-      <p className="text-xs text-slate-500">Durasi produk dikenal dari nama produk yang didukung atau durasi default di atas. Pembelian ulang produk SAMPE dengan email yang sama menunggu keputusan pemilik dan belum otomatis memperpanjang lisensi.</p>
+      <p className="text-xs text-slate-500">Webhook mengenali empat paket SAMPE. Pembelian ulang lisensi aktif atau kedaluwarsa memperpanjang lisensi yang sama. Pembelian ulang sebelum aktivasi masih menunggu penanganan admin.</p>
       <WebhookLogs />
     </div>
   );
