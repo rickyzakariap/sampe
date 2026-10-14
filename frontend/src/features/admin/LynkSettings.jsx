@@ -8,7 +8,8 @@ import { Copy, Link2, Loader2, Save } from "lucide-react";
 import { adminApi, errMsg } from "@/lib/api";
 import { copyText } from "./CreateLicenseForm";
 
-const WEBHOOK_URL = `${process.env.REACT_APP_BACKEND_URL}/api/webhooks/lynk`;
+const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || window.location.origin).replace(/\/+$/, "");
+const WEBHOOK_URL = `${BACKEND_URL}/api/webhooks/lynk`;
 const ACTIVATION_URL = `${window.location.origin}/aktivasi`;
 
 const CopyRow = ({ label, value, testid }) => (
@@ -65,7 +66,7 @@ export const LynkSettings = () => {
         ))}
         <span className="text-[11px] text-slate-500">(klik Simpan setelah memilih)</span>
       </div>
-      <p className="text-xs text-slate-500">Durasi dibaca dari nama produk Lynk: mengandung "1 Hari", "7 Hari", "30 Hari", "365 Hari" atau "1 Tahun". Kalau tidak ada, dipakai durasi default di atas. Pembelian ulang dengan email sama = perpanjang (sisa hari ditambah).</p>
+      <p className="text-xs text-slate-500">Durasi produk dikenal dari nama produk yang didukung atau durasi default di atas. Pembelian ulang produk SAMPE dengan email yang sama menunggu keputusan pemilik dan belum otomatis memperpanjang lisensi.</p>
       <WebhookLogs />
     </div>
   );

@@ -1,6 +1,7 @@
 import axios from "axios";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const BACKEND_URL = (process.env.REACT_APP_BACKEND_URL || "").replace(/\/+$/, "");
+const API = `${BACKEND_URL}/api`;
 export const TOKEN_KEY = "sampe_session_token";
 export const ADMIN_TOKEN_KEY = "sampe_admin_token";
 

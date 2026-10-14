@@ -79,6 +79,12 @@ if (!hotReloadDisabled) {
 export default defineConfig(async ({ mode, command }) => {
   const env = loadEnv(mode, __dirname, ["REACT_APP_", "VITE_"]);
   const emergentOverlay = await loadEmergentOverlay();
+  const define = Object.fromEntries(
+    Object.entries(env)
+      .filter(([key]) => key.startsWith("REACT_APP_"))
+      .map(([key, value]) => [`process.env.${key}`, JSON.stringify(value)]),
+  );
+  define["process.env.REACT_APP_BACKEND_URL"] = JSON.stringify(env.REACT_APP_BACKEND_URL || "");
   return {
     plugins: [
       // Visual-edit tagging is dev-server-only, matching the package's own apply: serve.
@@ -94,11 +100,7 @@ export default defineConfig(async ({ mode, command }) => {
     envPrefix: ["VITE_", "REACT_APP_"],
     // CRA parity: app code reads `process.env.REACT_APP_*`; Vite has no process.env in the
     // browser, so each REACT_APP_ key is inlined as a compile-time constant.
-    define: Object.fromEntries(
-      Object.entries(env)
-        .filter(([key]) => key.startsWith("REACT_APP_"))
-        .map(([key, value]) => [`process.env.${key}`, JSON.stringify(value)]),
-    ),
+    define,
     resolve: {
       alias: [{ find: "@", replacement: path.resolve(__dirname, "./src") }],
     },
@@ -184,6 +186,9 @@ export default defineConfig(async ({ mode, command }) => {
       // Build-error rendering: emergent-overlay when it loaded, else Vite's own overlay.
       hmr: hotReloadDisabled ? false : { overlay: !emergentOverlay },
       watch: hotReloadDisabled ? null : { usePolling: true, interval: 300 },
+      proxy: env.REACT_APP_BACKEND_URL
+        ? undefined
+        : { "/api": { target: "http://127.0.0.1:8000", changeOrigin: true } },
     },
   };
 });
