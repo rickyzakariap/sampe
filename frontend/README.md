@@ -12,12 +12,13 @@ at build time via `vite.config.mjs`).
 
 ## Scripts
 
-- `yarn start` / `yarn dev` — Vite dev server on port 3000 (supervisor runs `yarn start`)
-- `yarn build` — production bundle into `build/`
-- `yarn preview` — serve the production bundle locally
+- `npm ci` — install exactly from `package-lock.json`
+- `npm run start` / `npm run dev` — Vite dev server on port 3000
+- `npm run build` — production bundle into `build/`
+- `npm run preview` — serve the production bundle locally
 
-Hot reload is Vite HMR; restart the `frontend` supervisor program only after changing `.env`
-or `vite.config.mjs`, or after installing dependencies (`yarn add`, never npm).
+Hot reload is Vite HMR; restart the dev server after changing `.env` or
+`vite.config.mjs`, or after installing dependencies.
 
 Visual edits: the packaged `@emergentbase/visual-edits` plugin tags `.jsx`/`.tsx`; because this
 template keeps JSX in `.js`, `vite.config.mjs` stamps the same `x-*` metadata on `src/**/*.js`

@@ -3,16 +3,34 @@
 This repository is prepared for a reviewed staging deployment. Nothing in this
 file activates PostgreSQL, changes Lynk, or deploys the application.
 
+## Host decision before deployment
+
+The current WarnaHost cPanel exposes PostgreSQL and Application Manager using
+Phusion Passenger. Its Python instructions describe WSGI; persistent ASGI
+support for this account is unverified. Do not register this FastAPI app there
+as a WSGI application. Keep WarnaHost as the proposed static frontend host.
+
+One compatible backend option is a Render Python web service. Render documents
+FastAPI with Uvicorn and lists its smallest paid web-service compute at
+US$7/month on a US$0 Hobby workspace (pricing checked 2026-10-14). This is a
+proposal, not an approved purchase or deployment. Its connection to the
+existing WarnaHost PostgreSQL database must be verified before use. If remote
+database access is unavailable, a separate database service would be needed;
+Render lists paid PostgreSQL starting at US$6/month. Do not create it without
+approval. Sources: https://render.com/docs/deploy-fastapi and
+https://render.com/pricing.
+
 ## Runtime layout
 
 - Serve the Vite bundle from `frontend/build/` over HTTPS at
   `https://sampe.satsetdigital.id`, with SPA fallback to `index.html`.
-- Route `/api/*` on the same origin to the persistent FastAPI process. The Lynk
-  webhook path remains `/api/webhooks/lynk`. Keep the backend behind a trusted
-  HTTPS reverse proxy and restrict direct public access to its port.
+- For a split deployment, use an approved HTTPS backend origin such as
+  `https://api.sampe.satsetdigital.id`; frontend calls that origin's `/api`.
+  The Lynk webhook path remains `/api/webhooks/lynk`. Do not change the live
+  webhook until the backend, database, and activation flow are verified.
 - Start the backend from `backend/` with
-  `uvicorn server:app --host 0.0.0.0 --port 8000`. The ASGI entrypoint is
-  `server:app`. Set the process port to the value required by the selected
+  `uvicorn server:app --host 0.0.0.0 --port $PORT` on a host that sets `PORT`.
+  The ASGI entrypoint is `server:app`. Set the process port to the value required by the selected
   host. Send stdout and stderr to the host's protected application logs.
 - `GET /api/health` checks database connectivity and returns only `status`.
   A failed check returns HTTP 503 without connection details.
@@ -42,9 +60,12 @@ For a same-origin deployment, leave `REACT_APP_BACKEND_URL` empty at **build
 time** so frontend calls `/api`. Set `REACT_APP_ADMIN_PATH` to the intended
 public admin route, or use the existing `/admin` default. Both are compile-time
 settings; neither is an authentication secret. Build from `frontend/` with
-`yarn build` after installing the locked frontend dependencies. `build/` is
+`npm ci` then `npm run build` using the committed lockfile. `build/` is
 excluded from Git. A split frontend/backend origin requires an HTTPS backend
-URL and matching `CORS_ORIGINS` before building.
+URL and matching `CORS_ORIGINS` before building. Upload the generated `build/`
+contents to the WarnaHost document root for the SAMPE subdomain and configure
+SPA fallback to `index.html` for routes such as `/aktivasi`. These hosting
+changes require deployment approval.
 
 ## New staging database
 
@@ -63,6 +84,16 @@ all production migrations. Verify the 11 tables and run synthetic staging
 checks before any production release. Production schema application and any
 customer-data migration require a separate reviewed procedure and approval;
 do not point staging settings at an existing production database.
+
+The Lynk store URL is `https://lynk.id/katalogsat`. The application does not
+hard-code the store URL: the purchase button uses the `renew_url` saved in
+SAMPE Admin. Before release, inspect that setting and preserve any valid
+product-specific URL. A changed store URL alone does not imply a new Merchant
+Key. Do not alter the Lynk webhook or Merchant Key before a reviewed cutover.
+
+Retain and back up the existing MongoDB data. An empty PostgreSQL schema does
+not contain old accounts, orders, or licenses. Any customer-data move, count
+reconciliation, and production cutover need a separate approved procedure.
 
 Before deployment, confirm the chosen host provides a persistent ASGI process,
 HTTPS reverse proxy, PostgreSQL connectivity, private environment variables,
