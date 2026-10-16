@@ -11,7 +11,7 @@ import {
 import { LiveTeamTable, MonthCompare } from "@/components/DashboardExtras";
 import { KpiAlertBanner } from "@/components/KpiAlertBanner";
 import { rupiah, rupiahFull, pct, statusBg, statusLabel, statusColor } from "@/lib/format";
-import { TrendingUp, TrendingDown, Minus, Sparkles, Clock, Target, Wallet, Radio, Users, Megaphone, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, Clock, Target, Wallet, Radio, Users, Megaphone, ChevronRight } from "lucide-react";
 
 const CHART = ["#10B981", "#3B82F6", "#F59E0B", "#a855f7", "#EF4444", "#22d3ee", "#ec4899", "#94a3b8"];
 
@@ -92,7 +92,7 @@ const DetailDialog = ({ open, onClose, detail }) => {
   );
 };
 
-export const Dashboard = ({ data, compare, onAi, onGoInput }) => {
+export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, readOnly = false }) => {
   const [detail, setDetail] = useState(null);
   const [open, setOpen] = useState(false);
   if (!data) return null;
@@ -114,12 +114,13 @@ export const Dashboard = ({ data, compare, onAi, onGoInput }) => {
             Periode {data.config.month} · Hari ke-<span className="num">{month_meta.days_elapsed}</span> dari <span className="num">{month_meta.days_in_month}</span>
           </p>
         </div>
-        <Button data-testid="ai-analysis-trigger-button" onClick={onAi} disabled={!onAi} className={`bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold ${anyRed ? "glow-danger" : ""}`}>
-          <Sparkles className="h-4 w-4 mr-1.5" /> Analisa AI
-        </Button>
+        {!readOnly && <Button data-testid="ai-analysis-trigger-button" onClick={onAi} disabled={!onAi || aiLoading} aria-busy={aiLoading} className={`bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold ${anyRed ? "glow-danger" : ""}`}>
+          {aiLoading ? <Loader2 className="h-4 w-4 mr-1.5 motion-safe:animate-spin" /> : <Sparkles className="h-4 w-4 mr-1.5 motion-safe:hover:animate-pulse" />}
+          {aiLoading ? "Menganalisis…" : "Analisa AI"}
+        </Button>}
       </div>
 
-      <KpiAlertBanner data={data} onGoInput={onGoInput} />
+      <KpiAlertBanner data={data} onGoInput={readOnly ? undefined : onGoInput} />
 
       <Card data-testid="dashboard-time-vs-kpi-tracker" className="bg-[#161F30] border-slate-800 p-5">
         <div className="grid gap-5 sm:grid-cols-3">

@@ -3,21 +3,24 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="referrer" content="no-referrer" />
         <meta name="theme-color" content="#000000" />
-        <meta name="description" content="A product of emergent.sh" />
+        <meta name="description" content="SAMPE — Analisis KPI dan performa bisnis untuk seller marketplace dan UMKM Indonesia." />
+        <link rel="icon" type="image/png" href="/branding/sampe-clear-portrait.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <link href="https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&display=swap" rel="stylesheet" />
         <title>SAMPE — KPI Analytics UMKM</title>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
-        <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
+        <script>if(!location.pathname.startsWith('/report/')){const s=document.createElement('script');s.src='https://assets.emergent.sh/scripts/emergent-main.js';document.head.appendChild(s)}else{const m=document.createElement('meta');m.name='robots';m.content='noindex,nofollow,noarchive';document.head.appendChild(m)}</script>
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
         <div id="root"></div>
         <script type="module" src="/src/index.js"></script>
         <script>
+            if (!location.pathname.startsWith('/report/')) {
             !(function (t, e) {
                 var o, n, p, r;
                 e.__SV ||
@@ -87,6 +90,7 @@
                     capturePerformance: false,
                 },
             });
+            }
         </script>
     </body>
 </html>

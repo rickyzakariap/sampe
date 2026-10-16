@@ -1,37 +1,15 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { Sparkles, AlertTriangle, Loader2 } from "lucide-react";
-
-const HEADINGS = /^(KONDISI SAAT INI|REKOMENDASI AKSI|TARGET REALISTIS):?\s*(.*)$/i;
-
-const renderAnalysis = (text = "") =>
-  text.split("\n").map((raw, i) => {
-    const line = raw.replace(/\*\*/g, "").trim();
-    if (!line) return <div key={i} className="h-2" />;
-    const h = line.match(HEADINGS);
-    if (h) return (
-      <div key={i} className="pt-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-emerald-400">{h[1]}</p>
-        {h[2] && <p className="mt-1">{h[2]}</p>}
-      </div>
-    );
-    const num = line.match(/^(\d+)[.)]\s*(.*)$/);
-    if (num) return (
-      <div key={i} className="flex gap-2 py-0.5">
-        <span className="shrink-0 grid place-items-center h-5 w-5 rounded bg-emerald-500/15 text-emerald-400 text-xs font-bold">{num[1]}</span>
-        <span>{num[2]}</span>
-      </div>
-    );
-    return <p key={i}>{line.replace(/^[-•]\s*/, "")}</p>;
-  });
+import { AiMarkdown } from "@/components/AiMarkdown";
 
 export const AiAnalysisPanel = ({ open, onClose, loading, result, error }) => (
   <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-    <SheetContent data-testid="ai-analysis-panel" className="w-full sm:max-w-lg bg-slate-950 border-slate-800 overflow-y-auto">
+    <SheetContent data-testid="ai-analysis-panel" aria-busy={loading} className="ai-analysis-panel w-full sm:max-w-lg bg-slate-950 border-slate-800 overflow-y-auto">
       <SheetHeader className="space-y-1">
         <SheetTitle className="flex items-center gap-2 text-xl">
           <span className="grid place-items-center h-8 w-8 rounded-lg bg-amber-500/15 border border-amber-500/30">
-            <Sparkles className="h-4 w-4 text-amber-400" />
+            <Sparkles className={`h-4 w-4 text-amber-400 ${loading ? "motion-safe:animate-pulse" : ""}`} />
           </span>
           Analisa AI KPI
         </SheetTitle>
@@ -40,14 +18,14 @@ export const AiAnalysisPanel = ({ open, onClose, loading, result, error }) => (
 
       <div className="mt-6 space-y-5">
         {loading && (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400">
-            <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+          <div role="status" aria-live="polite" className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400">
+            <Loader2 className="h-8 w-8 motion-safe:animate-spin text-emerald-400" />
             <p className="text-sm">AI sedang menganalisa data harianmu…</p>
           </div>
         )}
 
         {error && !loading && (
-          <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>
+          <div role="alert" className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>
         )}
 
         {!loading && result && (
@@ -68,9 +46,7 @@ export const AiAnalysisPanel = ({ open, onClose, loading, result, error }) => (
 
             <div data-testid="ai-analysis-recommendations-list" className="rounded-xl border border-slate-800 bg-[#161F30] p-5">
               <Badge variant="outline" className="mb-3 bg-emerald-500/10 border-emerald-500/30 text-emerald-400">Rekomendasi AI</Badge>
-              <div className="space-y-1 text-sm leading-relaxed text-slate-200">
-                {renderAnalysis(result.analysis)}
-              </div>
+              <AiMarkdown text={result.analysis} />
             </div>
             <p className="text-center text-xs text-slate-600">Dihasilkan oleh GPT · {new Date(result.generated_at).toLocaleString("id-ID")}</p>
           </>

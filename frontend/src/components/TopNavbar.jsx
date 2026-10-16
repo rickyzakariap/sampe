@@ -2,19 +2,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Activity, LayoutDashboard, ListChecks, Plus, Sparkles, Download, FileText, FileSpreadsheet, CalendarRange, Settings } from "lucide-react";
+import { LayoutDashboard, ListChecks, Plus, Sparkles, Loader2, Download, FileText, FileSpreadsheet, CalendarRange, Settings } from "lucide-react";
+import { BrandMark } from "@/components/BrandLogo";
 import { statusBg, statusLabel } from "@/lib/format";
 import { monthLabel } from "@/lib/export";
 import { LicenseMenu } from "@/features/auth/LicenseMenu";
 
-export const TopNavbar = ({ view, setView, company, overallStatus, onQuickAdd, onAi, months, month, onMonthChange, onExportCsv, onExportPdf, onEditCompany, license, user, readOnly, onLogout }) => (
+export const TopNavbar = ({ view, setView, company, overallStatus, onQuickAdd, onAi, aiLoading = false, months, month, onMonthChange, onExportCsv, onExportPdf, onEditCompany, license, user, readOnly, onLogout }) => (
   <header data-testid="top-navbar" className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800">
     <div className="mx-auto max-w-7xl px-4 sm:px-6">
       <div className="flex h-16 items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="grid place-items-center h-9 w-9 rounded-lg bg-emerald-500 text-slate-950">
-            <Activity className="h-5 w-5" strokeWidth={2.5} />
-          </div>
+          <BrandMark />
           <div className="min-w-0">
             <p className="font-heading font-extrabold leading-none tracking-tight">SAMPE</p>
             <button data-testid="navbar-company-edit" onClick={onEditCompany} title="Ubah nama perusahaan"
@@ -66,8 +65,9 @@ export const TopNavbar = ({ view, setView, company, overallStatus, onQuickAdd, o
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button data-testid="navbar-ai-button" onClick={onAi} disabled={readOnly} size="sm" variant="outline" className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hidden sm:inline-flex">
-            <Sparkles className="h-4 w-4 mr-1" /> Analisa AI
+          <Button data-testid="navbar-ai-button" onClick={onAi} disabled={readOnly || aiLoading} aria-busy={aiLoading} size="sm" variant="outline" className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 hidden sm:inline-flex">
+            {aiLoading ? <Loader2 className="h-4 w-4 mr-1 motion-safe:animate-spin" /> : <Sparkles className="h-4 w-4 mr-1 motion-safe:hover:animate-pulse" />}
+            {aiLoading ? "Menganalisis…" : "Analisa AI"}
           </Button>
           <Button data-testid="navbar-quick-add" onClick={onQuickAdd} disabled={readOnly} size="sm" className="bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-semibold">
             <Plus className="h-4 w-4 mr-1" /> Input

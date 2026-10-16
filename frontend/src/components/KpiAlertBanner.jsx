@@ -31,10 +31,10 @@ export const KpiAlertBanner = ({ data, onGoInput }) => {
           <p className="flex items-center gap-2 text-sm font-semibold text-amber-300"><ClipboardList className="h-4 w-4" /> Data hari ini belum diisi</p>
           <div className="mt-2 flex flex-wrap gap-2">
             {missing.map((m) => (
-              <button key={m} data-testid={`kpi-alert-missing-${m}`} onClick={() => onGoInput(m)}
+              onGoInput ? <button key={m} data-testid={`kpi-alert-missing-${m}`} onClick={() => onGoInput(m)}
                 className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-slate-900/60 px-3 py-1 text-xs text-amber-200 transition-colors hover:bg-amber-500/15">
                 {MODULE_LABEL[m]} <ArrowRight className="h-3 w-3" />
-              </button>
+              </button> : <span key={m} className="rounded-full border border-amber-500/30 bg-slate-900/60 px-3 py-1 text-xs text-amber-200">{MODULE_LABEL[m]}</span>
             ))}
           </div>
         </div>

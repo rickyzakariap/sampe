@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import "@/App.css";
 import { Toaster } from "@/components/ui/sonner";
 import { TopNavbar } from "@/components/TopNavbar";
@@ -11,6 +11,19 @@ import { api, currentMonth, shiftMonth } from "@/lib/api";
 import { exportCSV, exportPDF, monthLabel } from "@/lib/export";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { OwnerReportShare } from "@/features/owner-report/OwnerReportShare";
+import { Skeleton } from "@/components/ui/skeleton";
+
+function DashboardSkeleton() {
+  return <div role="status" aria-label="Memuat dashboard KPI" className="space-y-5 motion-reduce:animate-none">
+    <span className="sr-only">Memuat dashboard KPI…</span>
+    <Skeleton className="h-8 w-48 motion-reduce:animate-none" />
+    <div className="grid gap-4 sm:grid-cols-3">
+      {[0, 1, 2].map((i) => <Skeleton key={i} className="h-28 motion-reduce:animate-none" />)}
+    </div>
+    <Skeleton className="h-48 motion-reduce:animate-none" />
+  </div>;
+}
 
 function App({ license, writable, logout, renewUrl, user }) {
   const readOnly = !writable;
@@ -19,6 +32,7 @@ function App({ license, writable, logout, renewUrl, user }) {
   const [view, setView] = useState("dashboard");
   const [inputTab, setInputTab] = useState("sales");
   const [dash, setDash] = useState(null);
+  const [dashLoading, setDashLoading] = useState(false);
   const [compare, setCompare] = useState([]);
   const [months, setMonths] = useState([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -27,10 +41,14 @@ function App({ license, writable, logout, renewUrl, user }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiError, setAiError] = useState(null);
+  const aiPendingRef = useRef(false);
 
   const loadDash = useCallback(async (m) => {
-    try { setDash(await api.dashboard(m)); } catch { setDash(null); }
-    try { setCompare(await api.compare(m)); } catch { setCompare([]); }
+    setDashLoading(true);
+    try {
+      try { setDash(await api.dashboard(m)); } catch { setDash(null); }
+      try { setCompare(await api.compare(m)); } catch { setCompare([]); }
+    } finally { setDashLoading(false); }
   }, []);
 
   const onReady = useCallback(async (m) => {
@@ -48,7 +66,7 @@ function App({ license, writable, logout, renewUrl, user }) {
 
   useEffect(() => { boot().finally(() => setBooting(false)); }, [boot]);
 
-  const changeMonth = async (m) => { setMonth(m); await loadDash(m); };
+  const changeMonth = async (m) => { setMonth(m); setDash(null); await loadDash(m); };
 
   const goInput = (tab = "sales") => { setInputTab(tab); setView("input"); };
 
@@ -65,12 +83,15 @@ function App({ license, writable, logout, renewUrl, user }) {
   };
 
   const runAi = async () => {
+    if (aiPendingRef.current || readOnly) return;
+    aiPendingRef.current = true;
     setAiOpen(true); setAiLoading(true); setAiError(null); setAiResult(null);
     try {
       setAiResult(await api.analyze(month));
     } catch (e) {
       setAiError(e?.response?.data?.detail || "Gagal menjalankan analisa AI.");
     } finally {
+      aiPendingRef.current = false;
       setAiLoading(false);
     }
   };
@@ -108,6 +129,7 @@ function App({ license, writable, logout, renewUrl, user }) {
         overallStatus={overall}
         onQuickAdd={() => goInput(inputTab)}
         onAi={runAi}
+        aiLoading={aiLoading}
         months={months}
         month={month}
         onMonthChange={changeMonth}
@@ -120,13 +142,14 @@ function App({ license, writable, logout, renewUrl, user }) {
         nextMonthLabel={ob.config ? monthLabel(shiftMonth(ob.config.month, 1)) : ""} />
 
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
+        {view === "dashboard" && writable && <OwnerReportShare />}
         {view === "dashboard" && (
-          dash ? (
+          dashLoading ? <DashboardSkeleton /> : dash ? (
             <div className="space-y-6">
               {dash.has_config === false && !readOnly && (
                 <CopyTargetReminder month={month} fromMonth={dash.config.month} onCopy={ob.startCopy} />
               )}
-              <Dashboard data={dash} compare={compare} onAi={readOnly ? undefined : runAi} onGoInput={goInput} />
+              <Dashboard data={dash} compare={compare} onAi={readOnly ? undefined : runAi} aiLoading={aiLoading} onGoInput={goInput} />
             </div>
           ) : (
             <div className="text-center py-24 text-slate-500">

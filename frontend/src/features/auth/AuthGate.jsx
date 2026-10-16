@@ -3,6 +3,8 @@ import { Loader2 } from "lucide-react";
 import { api, TOKEN_KEY } from "@/lib/api";
 import { GoogleLogin } from "./GoogleLogin";
 import { ClaimLicense } from "./ClaimLicense";
+import { queryClient } from "@/lib/queryClient";
+import { toast } from "sonner";
 
 const Splash = () => (
   <div className="min-h-screen grid place-items-center bg-background text-slate-400">
@@ -25,9 +27,14 @@ export const AuthGate = ({ children }) => {
   }, []);
 
   const logout = async () => {
-    try { await api.logout(); } catch { /* noop */ }
-    localStorage.removeItem(TOKEN_KEY);
-    setSession(null);
+    try {
+      await api.logout();
+      localStorage.removeItem(TOKEN_KEY);
+      queryClient.clear();
+      setSession(null);
+    } catch {
+      toast.error("Gagal keluar. Coba lagi.");
+    }
   };
 
   if (session === undefined) return <Splash />;

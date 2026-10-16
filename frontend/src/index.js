@@ -8,6 +8,7 @@ import AdminPage from "@/features/admin/AdminPage";
 import ActivationPage from "@/features/activation/ActivationPage";
 import { AuthGate } from "@/features/auth/AuthGate";
 import { AuthCallback } from "@/features/auth/AuthCallback";
+import { OwnerReportPage } from "@/features/owner-report/OwnerReportPage";
 import { queryClient } from "@/lib/queryClient";
 
 const AppRouter = () => {
@@ -17,6 +18,7 @@ const AppRouter = () => {
     <Routes>
       <Route path={process.env.REACT_APP_ADMIN_PATH} element={<AdminPage />} />
       <Route path="/aktivasi" element={<ActivationPage />} />
+      <Route path="/report/:shareId" element={<OwnerReportPage />} />
       <Route path="*" element={<AuthGate>{(s) => <App key={s.license.id} {...s} />}</AuthGate>} />
     </Routes>
   );

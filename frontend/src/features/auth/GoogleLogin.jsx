@@ -1,4 +1,5 @@
-import { Activity, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { BrandWordmark } from "@/components/BrandLogo";
 
 const POINTS = [
   "Masuk pakai akun Google, tanpa password tambahan",
@@ -9,13 +10,7 @@ const POINTS = [
 export const AuthShell = ({ children }) => (
   <div className="min-h-screen bg-background text-foreground grid lg:grid-cols-[1.1fr_1fr]">
     <section className="hidden lg:flex flex-col justify-between border-r border-slate-800 bg-[#0d1424] p-12">
-      <div className="flex items-center gap-3">
-        <div className="grid place-items-center h-10 w-10 rounded-lg bg-emerald-500 text-slate-950"><Activity className="h-5 w-5" strokeWidth={2.5} /></div>
-        <div>
-          <p className="font-heading text-lg font-extrabold leading-none tracking-tight">SAMPE</p>
-          <p className="text-[11px] text-slate-500">System Analytic Marketplace</p>
-        </div>
-      </div>
+      <BrandWordmark />
       <div className="max-w-md space-y-6 animate-fade-up">
         <h1 className="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight">KPI toko harian, <span className="text-emerald-400">terukur tiap hari.</span></h1>
         <ul className="space-y-3">
@@ -43,7 +38,7 @@ export const GoogleLogin = () => {
   return (
     <AuthShell>
       <div data-testid="google-login-page">
-        <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400 lg:hidden">SAMPE · System Analytic Marketplace</p>
+        <div className="lg:hidden"><BrandWordmark compact /></div>
         <h2 className="mt-2 text-2xl font-extrabold tracking-tight">Masuk ke SAMPE</h2>
         <p className="mt-1 text-sm text-slate-400">Gunakan Gmail yang sama dengan email saat membeli lisensi di Lynk.id.</p>
       </div>

@@ -131,3 +131,15 @@
 .animate-fade-up { animation: fade-up 0.5s ease-out both; }
 .glow-danger { animation: pulse-glow 2s infinite; }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.85; cursor: pointer; }
+
+.ai-analysis-panel[data-state="open"],
+.ai-analysis-panel[data-state="closed"] {
+  animation-duration: 220ms !important;
+  transition-duration: 220ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-analysis-panel { animation: none !important; transition: none !important; }
+  .glow-danger { animation: none; }
+}
