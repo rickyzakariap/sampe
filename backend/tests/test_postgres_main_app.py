@@ -11,6 +11,7 @@ import sys
 import types
 import unittest
 import uuid
+from unittest.mock import patch
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -355,28 +356,12 @@ class MainAppPostgresTests(unittest.TestCase):
         self.assertNotIn("motor", sys.modules)
         self.assertNotIn("motor.motor_asyncio", sys.modules)
 
-    def test_ai_route_contract_with_in_process_llm_stub(self):
+    def test_ai_route_contract_with_in_process_provider_stub(self):
         import httpx
+        import ai_analysis
 
-        class FakeLlmChat:
-            def __init__(self, **kwargs):
-                pass
-
-            def with_model(self, *args):
-                return self
-
-            async def send_message(self, message):
-                return "Synthetic analysis"
-
-        modules = {
-            "emergentintegrations": types.ModuleType("emergentintegrations"),
-            "emergentintegrations.llm": types.ModuleType("emergentintegrations.llm"),
-            "emergentintegrations.llm.chat": types.ModuleType("emergentintegrations.llm.chat"),
-        }
-        modules["emergentintegrations.llm.chat"].LlmChat = FakeLlmChat
-        modules["emergentintegrations.llm.chat"].UserMessage = lambda text: text
-        prior = {name: sys.modules.get(name) for name in modules}
-        sys.modules.update(modules)
+        async def fake_provider(context):
+            return "Synthetic analysis", "mock-model"
         body, signature = self.payment()
 
         async def exercise():
@@ -392,14 +377,8 @@ class MainAppPostgresTests(unittest.TestCase):
                 self.assertEqual(result.status_code, 200, result.text)
                 self.assertEqual(result.json()["analysis"], "Synthetic analysis")
 
-        try:
+        with patch.object(ai_analysis, "request_analysis", fake_provider):
             asyncio.run(exercise())
-        finally:
-            for name, previous in prior.items():
-                if previous is None:
-                    sys.modules.pop(name, None)
-                else:
-                    sys.modules[name] = previous
 
 
 if __name__ == "__main__":

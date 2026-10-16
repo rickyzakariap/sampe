@@ -38,7 +38,7 @@ class MigrationGuardTests(unittest.TestCase):
                     migrate.validate_test_target(env, actual, confirmed)
 
     def test_every_forward_migration_has_a_rollback(self):
-        self.assertEqual(migrate.migration_versions(), ["0001_initial"])
+        self.assertEqual(migrate.migration_versions(), ["0001_initial", "0002_owner_report", "0003_ai_analysis"])
 
     def test_unlabeled_target_is_refused_before_driver_connection(self):
         with patch.dict("os.environ", {"SAMPE_POSTGRES_DSN": "unused", "SAMPE_POSTGRES_ENV": "production"}):
@@ -78,6 +78,15 @@ class MigrationGuardTests(unittest.TestCase):
         dropped = set(re.findall(r"DROP TABLE sampe\.([a-z_]+)", down))
         self.assertEqual(len(created), 11)
         self.assertEqual(created, dropped)
+
+    def test_incremental_migration_refuses_incomplete_production_schema(self):
+        up = (POSTGRES_DIR / "migrations" / "0001_initial.up.sql").read_text(encoding="utf-8")
+        tables = set(re.findall(r"CREATE TABLE sampe\.([a-z_]+)", up))
+        migrate.validate_existing_schema(["0001_initial"], tables)
+        with self.assertRaises(RuntimeError):
+            migrate.validate_existing_schema(["0001_initial"], tables - {"users"})
+        with self.assertRaises(RuntimeError):
+            migrate.validate_existing_schema([], tables)
 
 
 if __name__ == "__main__":

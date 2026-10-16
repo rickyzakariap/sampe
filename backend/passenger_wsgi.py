@@ -20,4 +20,13 @@ if DB_BACKEND != "postgres":
 from server import app, startup  # noqa: E402
 
 asyncio.run(startup())
-application = ASGIMiddleware(app)
+_wsgi_app = ASGIMiddleware(app)
+
+
+def application(environ, start_response):
+    """Restore the /api prefix stripped by Passenger's application mount."""
+    path = environ.get("PATH_INFO") or "/"
+    if path != "/api" and not path.startswith("/api/"):
+        environ = environ.copy()
+        environ["PATH_INFO"] = "/api" + (path if path.startswith("/") else "/" + path)
+    return _wsgi_app(environ, start_response)

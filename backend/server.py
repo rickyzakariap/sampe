@@ -7,10 +7,11 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 from datetime import datetime, date
 
-from core import db, client, DB_BACKEND, EMERGENT_LLM_KEY, now_iso, Entry, EntryInput, shift_month
+from core import db, client, DB_BACKEND, now_iso, Entry, EntryInput, shift_month
 from onboarding import router as onboarding_router
 from auth import router as auth_router, get_tenant, require_write, init_auth
 from lynk import router as lynk_router
+from owner_report import router as owner_report_router
 from fastapi import Depends
 
 app = FastAPI()
@@ -269,7 +270,10 @@ async def build_summary(month: str, tid: str):
 
 @api_router.get("/compare")
 async def compare_months(month: str, count: int = 3, p: dict = Depends(get_tenant)):
-    tid = p["tenant_id"]
+    return await build_compare(month, p["tenant_id"], count)
+
+
+async def build_compare(month: str, tid: str, count: int = 3):
     fallback = await db.kpi_config.find_one({"tenant_id": tid}, {"_id": 0}, sort=[("month", -1)])
     out = []
     for i in range(count - 1, -1, -1):
@@ -318,10 +322,12 @@ class AiRequest(BaseModel):
 
 @api_router.post("/ai/analyze")
 async def ai_analyze(payload: AiRequest, p: dict = Depends(require_write)):
+    if DB_BACKEND != "postgres":
+        raise HTTPException(503, "Analisa AI memerlukan PostgreSQL")
+    from ai_analysis import request_analysis, save_analysis, source_fingerprint
     summary = await build_summary(payload.month, p["tenant_id"])
-    from emergentintegrations.llm.chat import LlmChat, UserMessage
+    source_hash = await source_fingerprint(p["tenant_id"], payload.month)
 
-    cfg = summary["config"]
     mm = summary["month_meta"]
 
     def fmt(v):
@@ -355,7 +361,7 @@ async def ai_analyze(payload: AiRequest, p: dict = Depends(require_write)):
     )
     ads = summary["ads"]
     context = (
-        f"Toko: {cfg['company_name']}. Periode {payload.month}, baru jalan {mm['days_elapsed']} dari {mm['days_in_month']} hari "
+        f"Periode {payload.month}, baru jalan {mm['days_elapsed']} dari {mm['days_in_month']} hari "
         f"(sekitar {mm['days_elapsed']/mm['days_in_month']*100:.0f}% bulan sudah lewat).\n\n"
         f"KONDISI KPI:\n" + "\n".join(kpi_lines) + "\n\n"
         f"EFISIENSI IKLAN: tiap Rp1 belanja iklan menghasilkan Rp{ads['roi']:.2f} omzet.\n\n"
@@ -364,34 +370,26 @@ async def ai_analyze(payload: AiRequest, p: dict = Depends(require_write)):
         f"KOL: {summary['kol']['realized_count']} aktif dari target {summary['kol']['target_count']} KOL."
     )
 
-    chat = LlmChat(
-        api_key=EMERGENT_LLM_KEY,
-        session_id=f"kpi-{payload.month}-{datetime.now().timestamp()}",
-        system_message=(
-            "Kamu konsultan bisnis praktis untuk penjual marketplace & UMKM Indonesia yang awam istilah teknis. "
-            "Baca data KPI toko di bawah dan beri analisa yang BENAR-BENAR berdasarkan angka nyata di data, bukan saran umum. "
-            "Setiap poin WAJIB menyebut angka/channel/selisih dari data (mis. 'Shopee baru 12% dari target', 'kurang Rp5 juta', 'tren turun 22%'). "
-            "Pakai bahasa sehari-hari yang sederhana; kalau pakai istilah (omzet, ROI), jelaskan singkat. Hindari jargon seperti pace/AOV/CPA tanpa penjelasan. "
-            "Format jawaban dalam Bahasa Indonesia TANPA sapaan pembuka, persis seperti ini:\n\n"
-            "KONDISI SAAT INI:\n2-3 kalimat merangkum yang sedang terjadi berdasarkan data (channel mana kuat/lemah, tren, KPI yang bahaya).\n\n"
-            "REKOMENDASI AKSI:\n1-5 langkah bernomor yang konkret & bisa langsung dikerjakan seller, tiap langkah sebut angka/channel spesifik + perkiraan dampaknya ke target.\n\n"
-            "TARGET REALISTIS:\n1 kalimat berapa yang harus dikejar per hari di sisa bulan agar target tercapai."
-        ),
-    ).with_model("openai", "gpt-5.4")
-
-    try:
-        resp = await chat.send_message(UserMessage(text=context))
-    except Exception as e:
-        logging.exception("AI error")
-        raise HTTPException(500, f"Gagal memanggil AI: {e}")
-
-    return {"analysis": resp, "reds": reds, "generated_at": now_iso()}
+    analysis, model = await request_analysis(context)
+    return await save_analysis(p["tenant_id"], payload.month, source_hash, analysis, reds, model)
 
 
 app.include_router(api_router)
 app.include_router(onboarding_router)
 app.include_router(auth_router)
 app.include_router(lynk_router)
+app.include_router(owner_report_router)
+
+
+@app.middleware("http")
+async def owner_report_response_headers(request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/api/owner-report/"):
+        response.headers["Cache-Control"] = "private, no-store, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["X-Robots-Tag"] = "noindex, nofollow, noarchive"
+    return response
 
 
 @app.on_event("startup")

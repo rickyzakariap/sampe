@@ -20,6 +20,18 @@ def migration_versions() -> list[str]:
     return versions
 
 
+def validate_existing_schema(applied: list[str], actual: set[str]) -> None:
+    """Refuse an incremental migration if the recorded schema is incomplete."""
+    if not applied:
+        raise RuntimeError("Production has tables without an applied SAMPE migration")
+    expected = set()
+    for version in applied:
+        sql = (MIGRATIONS_DIR / f"{version}.up.sql").read_text(encoding="utf-8")
+        expected.update(re.findall(r"CREATE TABLE sampe\.([a-z_]+)", sql))
+    if actual != expected:
+        raise RuntimeError("Production SAMPE tables do not match the applied migration history")
+
+
 def validate_test_target(environment: str, actual_database: str, confirmed_database: str) -> None:
     if environment != "testing":
         raise RuntimeError("SAMPE_POSTGRES_ENV must be 'testing' for this migration runner")
@@ -73,13 +85,15 @@ def migrate(direction: str, confirmed_database: str, allow_production: bool = Fa
             conn.execute("SET LOCAL lock_timeout = '5s'")
             conn.execute("SET LOCAL statement_timeout = '30s'")
             conn.execute("SELECT pg_advisory_xact_lock(hashtext('sampe_schema_migrations'))")
+            existing_tables = None
             if environment == "production":
                 existing_tables = conn.execute(
                     "SELECT 1 FROM pg_catalog.pg_tables "
                     "WHERE schemaname NOT IN ('pg_catalog', 'information_schema') LIMIT 1"
                 ).fetchone()
-                if existing_tables:
-                    raise RuntimeError("Production migration requires an empty database")
+                marker = conn.execute("SELECT to_regclass('public.sampe_schema_migrations')").fetchone()[0]
+                if existing_tables and not marker:
+                    raise RuntimeError("Production schema has tables but no SAMPE migration marker")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS public.sampe_schema_migrations (
                     version text PRIMARY KEY,
@@ -91,6 +105,11 @@ def migrate(direction: str, confirmed_database: str, allow_production: bool = Fa
             ).fetchall()]
             if applied != versions[:len(applied)]:
                 raise RuntimeError("Applied migration history does not match the files")
+            if environment == "production" and existing_tables:
+                actual = {row[0] for row in conn.execute(
+                    "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname='sampe'"
+                ).fetchall()}
+                validate_existing_schema(applied, actual)
 
             if direction == "up":
                 for version in versions[len(applied):]:
