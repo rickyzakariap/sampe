@@ -11,6 +11,7 @@ import {
 import { LiveTeamTable, MonthCompare } from "@/components/DashboardExtras";
 import { KpiAlertBanner } from "@/components/KpiAlertBanner";
 import { rupiah, rupiahFull, pct, statusBg, statusLabel, statusColor } from "@/lib/format";
+import { handleCardKeyDown } from "@/lib/cardInteraction.mjs";
 import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, Clock, Target, Wallet, Radio, Users, Megaphone, ChevronRight } from "lucide-react";
 
 const CHART = ["#10B981", "#3B82F6", "#F59E0B", "#a855f7", "#EF4444", "#22d3ee", "#ec4899", "#94a3b8"];
@@ -25,10 +26,12 @@ const TipBox = ({ active, payload, label }) =>
     </div>
   ) : null;
 
+const metricCardInteraction = "group bg-[#161F30] border-slate-800 p-5 animate-fade-up motion-reduce:animate-none cursor-pointer transition-colors hover:border-emerald-500/40 active:border-emerald-500/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950";
+
 const MetricCard = ({ testid, icon: Icon, label, m, unit = "rp", onClick }) => {
   const full = (v) => (unit === "rp" ? rupiahFull(v) : `${Number(v).toFixed(1)} jam`);
   return (
-    <Card data-testid={testid} onClick={onClick} className="group bg-[#161F30] border-slate-800 p-5 animate-fade-up cursor-pointer transition-colors hover:border-emerald-500/40">
+    <Card data-testid={testid} role="button" tabIndex={0} aria-label={`Lihat detail ${label}`} aria-haspopup="dialog" onClick={onClick} onKeyDown={(event) => handleCardKeyDown(event, onClick)} className={metricCardInteraction}>
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2 text-slate-400">
           <Icon className="h-4 w-4" />
@@ -37,7 +40,7 @@ const MetricCard = ({ testid, icon: Icon, label, m, unit = "rp", onClick }) => {
         <Badge variant="outline" className={statusBg[m.status]}>{statusLabel[m.status]}</Badge>
       </div>
       <p className="num mt-3 text-2xl sm:text-3xl font-bold text-white">{full(m.achieved)}</p>
-      <p className="text-xs text-slate-500">dari target {full(m.monthly_target)}</p>
+      <p className="text-xs text-slate-400">dari target {full(m.monthly_target)}</p>
       <Progress value={Math.min(m.achieved_pct, 100)} className="mt-3 h-1.5 bg-slate-800" />
       <div className="mt-2 flex items-center justify-between text-xs">
         <span className="text-slate-400">Prorata s/d hari ini: <span className="num text-slate-200">{full(m.expected_to_date)}</span></span>
@@ -45,9 +48,9 @@ const MetricCard = ({ testid, icon: Icon, label, m, unit = "rp", onClick }) => {
       </div>
       <div className="mt-2 flex items-center justify-between text-xs">
         {m.gap > 0 ? (
-          <span className="text-slate-500">Kurang <span className="num text-red-400">{full(m.gap)}</span> · butuh <span className="num text-amber-400">{full(m.needed_per_day)}/hari</span></span>
+          <span className="text-slate-400">Kurang <span className="num text-red-400">{full(m.gap)}</span> · butuh <span className="num text-amber-400">{full(m.needed_per_day)}/hari</span></span>
         ) : <span className="text-emerald-400">Target prorata tercapai</span>}
-        <span className="inline-flex items-center gap-0.5 text-slate-500 group-hover:text-emerald-400 transition-colors">Detail <ChevronRight className="h-3 w-3" /></span>
+        <span className="inline-flex items-center gap-0.5 text-slate-400 group-hover:text-emerald-400 transition-colors">Detail <ChevronRight className="h-3 w-3" /></span>
       </div>
     </Card>
   );
@@ -103,6 +106,7 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
   const anyRed = [sales, ads, kol, live_hours, live_revenue].some((m) => m.status === "red");
 
   const show = (cfg) => { setDetail(cfg); setOpen(true); };
+  const showAdsDetail = () => show({ title: "Efisiensi Ads per Platform", subtitle: "Belanja & ROAS per platform", rows: breakdowns.ads, unit: "rp", showRoi: true });
 
   return (
     <div className="space-y-6" data-testid="analytics-dashboard-view">
@@ -137,7 +141,7 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
           <div>
             <div className="flex items-center gap-2 text-slate-400"><TrendIcon className={`h-4 w-4 ${trendColor}`} /><span className="text-xs font-semibold uppercase tracking-wider">Trend Harian</span></div>
             <p className={`num mt-2 text-2xl font-bold ${trendColor}`}>{trend.pct > 0 ? "+" : ""}{pct(trend.pct)}</p>
-            <p className="num text-xs text-slate-500 mt-1">{trend.abs >= 0 ? "+" : ""}{rupiahFull(trend.abs)} vs hari sebelumnya</p>
+            <p className="num text-xs text-slate-400 mt-1">{trend.abs >= 0 ? "+" : ""}{rupiahFull(trend.abs)} vs hari sebelumnya</p>
           </div>
         </div>
       </Card>
@@ -153,10 +157,10 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
           onClick={() => show({ title: "Detail Durasi Live", subtitle: "Jam live per streamer", rows: breakdowns.live_hours, unit: "jam" })} />
         <MetricCard testid="metric-kol" icon={Users} label="Budget KOL" m={kol}
           onClick={() => show({ title: "Detail Budget KOL", subtitle: "Budget per KOL", rows: breakdowns.kol, unit: "rp" })} />
-        <Card data-testid="metric-ads-roi" onClick={() => show({ title: "Efisiensi Ads per Platform", subtitle: "Belanja & ROAS per platform", rows: breakdowns.ads, unit: "rp", showRoi: true })} className="group bg-[#161F30] border-slate-800 p-5 animate-fade-up cursor-pointer transition-colors hover:border-emerald-500/40">
+        <Card data-testid="metric-ads-roi" role="button" tabIndex={0} aria-label="Lihat detail Efisiensi Ads per Platform" aria-haspopup="dialog" onClick={showAdsDetail} onKeyDown={(event) => handleCardKeyDown(event, showAdsDetail)} className={metricCardInteraction}>
           <div className="flex items-center gap-2 text-slate-400"><TrendingUp className="h-4 w-4" /><span className="text-xs font-semibold uppercase tracking-wider">Efisiensi Ads</span></div>
           <p className="num mt-3 text-2xl sm:text-3xl font-bold text-white">{ads.roi.toFixed(2)}x</p>
-          <p className="text-xs text-slate-500">ROAS · Revenue {rupiah(ads.revenue)}</p>
+          <p className="text-xs text-slate-400">ROAS · Revenue {rupiah(ads.revenue)}</p>
           <div className="mt-3 flex items-center justify-between text-xs">
             <span className="text-slate-400">CPA rata-rata</span>
             <span className="num text-slate-200">{rupiahFull(ads.cpa)}</span>
@@ -165,7 +169,7 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
             <span className="text-slate-400">KOL terealisasi</span>
             <span className="num text-slate-200">{kol.realized_count}/{kol.target_count}</span>
           </div>
-          <div className="mt-2 flex justify-end text-xs"><span className="inline-flex items-center gap-0.5 text-slate-500 group-hover:text-emerald-400 transition-colors">Detail <ChevronRight className="h-3 w-3" /></span></div>
+          <div className="mt-2 flex justify-end text-xs"><span className="inline-flex items-center gap-0.5 text-slate-400 group-hover:text-emerald-400 transition-colors">Detail <ChevronRight className="h-3 w-3" /></span></div>
         </Card>
       </div>
 
