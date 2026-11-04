@@ -11,12 +11,13 @@ from postgres.access import PostgresAccess
 
 DSN = os.environ.get('SAMPE_POSTGRES_DSN', '')
 target = urlparse(DSN)
-if (os.environ.get('SAMPE_POSTGRES_ENV') != 'testing' or target.hostname != '127.0.0.1'
-        or target.port != 55435 or target.path != '/sampe_google_test'):
-    raise RuntimeError('Only the dedicated disposable local Google auth database is allowed')
-
-
 class GooglePostgresTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        if (os.environ.get('SAMPE_POSTGRES_ENV') != 'testing' or target.hostname != '127.0.0.1'
+                or target.port != 55435 or target.path != '/sampe_google_test'):
+            raise unittest.SkipTest('Requires the dedicated disposable local Google auth database')
+
     def setUp(self):
         self.db = PostgresAccess(DSN)
         self.tag = secrets.token_hex(8)
