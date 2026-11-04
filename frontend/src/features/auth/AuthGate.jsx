@@ -38,7 +38,7 @@ export const AuthGate = ({ children }) => {
   };
 
   if (session === undefined) return <Splash />;
-  if (!session) return <GoogleLogin />;
+  if (!session) return <GoogleLogin onAuthenticated={check} />;
   if (!session.license || session.license.status === "revoked") {
     return <ClaimLicense user={session.user} license={session.license} renewUrl={session.renew_url} onClaimed={check} onLogout={logout} />;
   }

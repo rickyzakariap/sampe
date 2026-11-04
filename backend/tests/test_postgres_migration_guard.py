@@ -38,7 +38,7 @@ class MigrationGuardTests(unittest.TestCase):
                     migrate.validate_test_target(env, actual, confirmed)
 
     def test_every_forward_migration_has_a_rollback(self):
-        self.assertEqual(migrate.migration_versions(), ["0001_initial", "0002_owner_report", "0003_ai_analysis"])
+        self.assertEqual(migrate.migration_versions(), ["0001_initial", "0002_owner_report", "0003_ai_analysis", "0004_google_identity"])
 
     def test_unlabeled_target_is_refused_before_driver_connection(self):
         with patch.dict("os.environ", {"SAMPE_POSTGRES_DSN": "unused", "SAMPE_POSTGRES_ENV": "production"}):

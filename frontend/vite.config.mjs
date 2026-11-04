@@ -86,9 +86,12 @@ export default defineConfig(async ({ mode, command }) => {
   );
   define["process.env.REACT_APP_BACKEND_URL"] = JSON.stringify(env.REACT_APP_BACKEND_URL || "");
   define["process.env.REACT_APP_AUTH_URL"] = JSON.stringify(env.REACT_APP_AUTH_URL || "");
+  define["process.env.REACT_APP_GOOGLE_DIRECT_AUTH"] = JSON.stringify(env.REACT_APP_GOOGLE_DIRECT_AUTH || "false");
+  define["process.env.REACT_APP_GOOGLE_CLIENT_ID"] = JSON.stringify(env.REACT_APP_GOOGLE_CLIENT_ID || "");
   define["process.env.REACT_APP_ADMIN_PATH"] = JSON.stringify(env.REACT_APP_ADMIN_PATH || "/admin");
   return {
     plugins: [
+      { name: 'sampe-auth-bootstrap', transformIndexHtml: (html) => html.replace('__SAMPE_LOAD_EMERGENT__', env.REACT_APP_GOOGLE_DIRECT_AUTH === 'true' ? 'false' : 'true') },
       // Visual-edit tagging is dev-server-only, matching the package's own apply: serve.
       jsxInJs({ tagForVisualEdits: command === "serve" && !visualEditsDisabled }),
       react(),

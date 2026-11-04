@@ -5,6 +5,7 @@ provide a DSN for an isolated PostgreSQL runtime or test environment.
 """
 
 import uuid
+import hashlib
 from datetime import datetime, timedelta, timezone
 
 from license_rules import activate_fields, extend_fields, generate_license_code, license_status, new_license, renewal_expires_at
@@ -32,6 +33,45 @@ class PostgresAccess:
 
     def _after_license_write(self):
         """Test seam for proving transaction rollback after the license write."""
+
+    def new_google_challenge(self, nonce, at=None):
+        at = at or now()
+        digest = hashlib.sha256(nonce.encode()).hexdigest()
+        with self.connect() as conn, conn.transaction():
+            conn.execute("DELETE FROM sampe.google_login_challenges WHERE expires_at < %s", (at,))
+            conn.execute("INSERT INTO sampe.google_login_challenges (nonce_hash,expires_at) VALUES (%s,%s)",
+                         (digest, at + timedelta(minutes=5)))
+
+    def start_google_session(self, sub, email, name, picture, nonce, session_token, at=None):
+        """Consume a one-use nonce and link an authoritative Google identity atomically."""
+        at = at or now()
+        email = email.strip().lower()
+        if not sub or not valid_buyer_email(email) or not nonce or not session_token:
+            raise ValueError("Invalid identity")
+        digest = hashlib.sha256(nonce.encode()).hexdigest()
+        with self.connect() as conn, conn.transaction():
+            challenge = conn.execute("DELETE FROM sampe.google_login_challenges WHERE nonce_hash=%s AND expires_at>%s RETURNING nonce_hash",
+                                     (digest, at)).fetchone()
+            if not challenge:
+                raise PermissionError("Challenge expired or consumed")
+            conn.execute("INSERT INTO sampe.lynk_email_locks (email,touched_at) VALUES (%s,%s) ON CONFLICT (email) DO UPDATE SET touched_at=EXCLUDED.touched_at", (email, at))
+            linked = conn.execute("SELECT m.* FROM sampe.google_identities g JOIN sampe.members m ON m.user_id=g.user_id WHERE g.google_sub=%s FOR UPDATE OF m", (sub,)).fetchone()
+            member = conn.execute("SELECT * FROM sampe.members WHERE email=%s FOR UPDATE", (email,)).fetchone()
+            if linked and (not member or linked['user_id'] != member['user_id']):
+                raise PermissionError("Identity conflict")
+            if member:
+                existing = conn.execute("SELECT google_sub FROM sampe.google_identities WHERE user_id=%s", (member['user_id'],)).fetchone()
+                if existing and existing['google_sub'] != sub:
+                    raise PermissionError("Identity conflict")
+            else:
+                member = {'user_id': str(uuid.uuid4()), 'email': email, 'name': name, 'picture': picture, 'created_at': at}
+                conn.execute("INSERT INTO sampe.members (user_id,email,name,picture,created_at) VALUES (%(user_id)s,%(email)s,%(name)s,%(picture)s,%(created_at)s)", member)
+            conn.execute("INSERT INTO sampe.google_identities (google_sub,user_id) VALUES (%s,%s) ON CONFLICT (google_sub) DO NOTHING", (sub, member['user_id']))
+            resolved = conn.execute("SELECT user_id FROM sampe.google_identities WHERE google_sub=%s", (sub,)).fetchone()
+            if not resolved or resolved['user_id'] != member['user_id']:
+                raise PermissionError("Identity conflict")
+            conn.execute("INSERT INTO sampe.user_sessions (session_token,user_id,expires_at,created_at) VALUES (%s,%s,%s,%s)", (session_token, member['user_id'], at + timedelta(days=7), at))
+            return member['user_id']
 
     def _bind_first_unowned(self, conn, member: dict, at):
         lic = conn.execute("""SELECT * FROM sampe.licenses WHERE email=%s AND owner_user_id IS NULL

@@ -1,6 +1,7 @@
 """Auth: Google (Emergent) untuk user + lisensi per akun, admin email/password, manajemen lisensi."""
 import os
 import uuid
+import secrets
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
@@ -140,12 +141,73 @@ class SessionIn(BaseModel):
     session_id: str
 
 
+class GoogleDirectIn(BaseModel):
+    credential: str = Field(min_length=1, max_length=16384)
+
+
+def _google_direct_config(request: Request):
+    from google_direct import allowed_origin
+    if os.environ.get('GOOGLE_DIRECT_AUTH_ENABLED') != 'true' or DB_BACKEND != 'postgres':
+        raise HTTPException(404, 'Tidak tersedia')
+    client_id = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+    origin = request.headers.get('origin', '')
+    if not client_id or not allowed_origin(origin):
+        raise HTTPException(403, 'Permintaan tidak diizinkan')
+    return client_id, origin
+
+
+@router.post('/auth/google-direct/challenge')
+async def google_direct_challenge(request: Request, response: Response):
+    _, origin = _google_direct_config(request)
+    from postgres.access import PostgresAccess
+    from starlette.concurrency import run_in_threadpool
+    nonce = secrets.token_urlsafe(32)
+    await run_in_threadpool(PostgresAccess(db.dsn).new_google_challenge, nonce)
+    response.set_cookie('sampe_google_nonce', nonce, httponly=True, secure=origin.startswith('https://'),
+                        samesite='strict', path='/api/auth/google-direct', max_age=300)
+    response.headers['Cache-Control'] = 'no-store'
+    return {'nonce': nonce}
+
+
+@router.post('/auth/google-direct')
+async def google_direct_login(payload: GoogleDirectIn, request: Request, response: Response):
+    client_id, origin = _google_direct_config(request)
+    nonce = request.cookies.get('sampe_google_nonce', '')
+    if not nonce:
+        raise HTTPException(401, 'Sesi login telah habis')
+    from google_direct import authoritative_identity, verify_google_id_token
+    from postgres.access import PostgresAccess
+    from starlette.concurrency import run_in_threadpool
+    try:
+        claims = await run_in_threadpool(verify_google_id_token, payload.credential, client_id)
+        sub, email = authoritative_identity(claims)
+        token_nonce = claims.get('nonce')
+        if not isinstance(token_nonce, str) or not secrets.compare_digest(nonce, token_nonce):
+            raise ValueError('Nonce mismatch')
+        token = secrets.token_urlsafe(48)
+        await run_in_threadpool(PostgresAccess(db.dsn).start_google_session, sub, email,
+                                claims.get('name') or '', claims.get('picture'), nonce, token)
+    except PermissionError:
+        raise HTTPException(403, 'Akun memerlukan verifikasi lebih lanjut. Hubungi admin.')
+    except (ValueError, KeyError):
+        raise HTTPException(401, 'Login Google gagal, coba lagi')
+    except RuntimeError:
+        raise HTTPException(503, 'Verifikasi Google sedang tidak tersedia')
+    response.delete_cookie('sampe_google_nonce', path='/api/auth/google-direct', secure=origin.startswith('https://'), samesite='strict')
+    response.set_cookie('session_token', token, httponly=True, secure=origin.startswith('https://'),
+                        samesite='lax', path='/', max_age=SESSION_DAYS * 86400)
+    response.headers['Cache-Control'] = 'no-store'
+    return {'ok': True}
+
+
 class ClaimIn(BaseModel):
     code: str = Field(min_length=4, max_length=40)
 
 
 @router.post("/auth/google-session")
 async def google_session(payload: SessionIn, response: Response):
+    if os.environ.get('GOOGLE_LEGACY_AUTH_ENABLED', 'true').lower() != 'true':
+        raise HTTPException(404, 'Tidak tersedia')
     async with httpx.AsyncClient(timeout=15) as c:
         r = await c.get(EMERGENT_SESSION_URL, headers={"X-Session-ID": payload.session_id})
     if r.status_code != 200:
