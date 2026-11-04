@@ -66,6 +66,7 @@
   .sampe-metric-ledger > [data-testid="metric-ads-roi"] { grid-column: 1 / -1; }
 }
 
+.sampe-input { min-width: 0; }
 .sampe-input > div:first-child { padding-bottom: 1rem; border-bottom: 1px solid #293548; }
 .sampe-input > div:first-child > p:first-child { color: #aebacb; font-size: .8rem; text-transform: none; letter-spacing: .02em; }
 .sampe-input > div:first-child h1 { margin-top: .25rem; font-size: clamp(1.75rem, 2.7vw, 2.5rem); font-weight: 600; }
@@ -112,7 +113,7 @@
   .sampe-metric-ledger > [role="button"] { padding: 1rem; }
   .sampe-metric-ledger > [role="button"] > div { gap: .5rem; flex-wrap: wrap; }
   .sampe-metric-ledger > .sampe-metric-primary { grid-template-columns: minmax(0, 1fr); grid-template-areas: "header" "value" "target" "progress" "prorata" "gap"; }
-  .sampe-input [role="tablist"] { flex-wrap: nowrap; overflow-x: auto; }
+  .sampe-input [role="tablist"] { max-width: 100%; min-width: 0; flex-wrap: nowrap; overflow-x: auto; }
   .sampe-input [role="tab"] { flex: 0 0 auto; }
 }
 @media (max-width: 767px) {
