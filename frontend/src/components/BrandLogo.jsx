@@ -10,7 +10,7 @@ export const BrandMark = () => (
 );
 
 export const BrandWordmark = ({ compact = false }) => (
-  <span role="img" aria-label="SAMPE — System Analytic Marketplace" className={`relative block shrink-0 overflow-hidden ${compact ? "h-[77px] w-[160px]" : "h-[96px] w-[200px]"}`}>
+  <span role="img" aria-label="SAMPE, System Analytic Marketplace" className={`relative block shrink-0 overflow-hidden ${compact ? "h-[77px] w-[160px]" : "h-[96px] w-[200px]"}`}>
     <img src={LOGO} alt="" className={`pointer-events-none absolute max-w-none ${compact ? "left-[-33px] top-[-75px] w-[227px]" : "left-[-41px] top-[-94px] w-[284px]"}`} />
   </span>
 );

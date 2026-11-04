@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { OwnerReportShare } from "@/features/owner-report/OwnerReportShare";
 import { Skeleton } from "@/components/ui/skeleton";
+import { motion, useReducedMotion } from "framer-motion";
 
 function DashboardSkeleton() {
   return <div role="status" aria-label="Memuat dashboard KPI" className="space-y-5 motion-reduce:animate-none">
@@ -26,6 +27,7 @@ function DashboardSkeleton() {
 }
 
 function App({ license, writable, logout, renewUrl, user }) {
+  const reduceMotion = useReducedMotion();
   const readOnly = !writable;
   const [booting, setBooting] = useState(true);
   const [month, setMonth] = useState(currentMonth());
@@ -100,7 +102,7 @@ function App({ license, writable, logout, renewUrl, user }) {
     return (
       <div className="min-h-screen grid place-items-center bg-background text-slate-400">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-400" />
+          <Loader2 className="h-8 w-8 motion-safe:animate-spin text-emerald-400" />
           <p className="text-sm">Memuat SAMPE…</p>
         </div>
       </div>
@@ -141,7 +143,9 @@ function App({ license, writable, logout, renewUrl, user }) {
         onSave={ob.saveCompany} onReset={ob.resetAll} onCopyNext={() => ob.startCopy()} readOnly={readOnly}
         nextMonthLabel={ob.config ? monthLabel(shiftMonth(ob.config.month, 1)) : ""} />
 
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
+      <motion.main key={view} initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : 0.18, ease: "easeOut" }}
+        className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
         {view === "dashboard" && writable && <OwnerReportShare />}
         {view === "dashboard" && (
           dashLoading ? <DashboardSkeleton /> : dash ? (
@@ -161,7 +165,7 @@ function App({ license, writable, logout, renewUrl, user }) {
         {view === "input" && (
           <DailyInput month={month} initialTab={inputTab} readOnly={readOnly} missingToday={dash?.missing_today || []} onChanged={() => loadDash(month)} />
         )}
-      </main>
+      </motion.main>
 
       <OnboardingWizard key={ob.wizardKey} open={ob.showWizard} onComplete={ob.completeOnboarding} onSeed={ob.seedDemo}
         initial={ob.wizardInitial} onCancel={ob.cancelCopy} />

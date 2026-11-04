@@ -36,7 +36,7 @@ test("interactive KPI cards have button semantics, visible focus, and no nested 
     assert.equal(elements(card.children).filter((node) => node.openingElement.name.name === "button").length, 0);
   }
   assert.match(source, /focus-visible:ring-2/);
-  assert.match(source, /motion-reduce:animate-none/);
+  assert.doesNotMatch(source.match(/const metricCardInteraction = "[^"]+"/)?.[0] || "", /animate-/);
   assert.equal(cards.filter((node) => !attributes(node).has("onClick") && attributes(node).has("role")).length, 0);
 });
 

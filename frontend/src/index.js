@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import "@/index.css";
+import "@/visual-overhaul.css";
 import App from "@/App";
 import AdminPage from "@/features/admin/AdminPage";
 import ActivationPage from "@/features/activation/ActivationPage";

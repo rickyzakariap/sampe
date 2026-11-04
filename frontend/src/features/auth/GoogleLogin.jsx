@@ -1,4 +1,3 @@
-import { ShieldCheck } from "lucide-react";
 import { BrandWordmark } from "@/components/BrandLogo";
 
 const POINTS = [
@@ -8,20 +7,20 @@ const POINTS = [
 ];
 
 export const AuthShell = ({ children }) => (
-  <div className="min-h-screen bg-background text-foreground grid lg:grid-cols-[1.1fr_1fr]">
-    <section className="hidden lg:flex flex-col justify-between border-r border-slate-800 bg-[#0d1424] p-12">
-      <BrandWordmark />
-      <div className="max-w-md space-y-6 animate-fade-up">
-        <h1 className="text-4xl xl:text-5xl font-extrabold leading-tight tracking-tight">KPI toko harian, <span className="text-emerald-400">terukur tiap hari.</span></h1>
-        <ul className="space-y-3">
-          {POINTS.map((p) => <li key={p} className="flex gap-3 text-sm text-slate-300"><ShieldCheck className="h-5 w-5 shrink-0 text-emerald-400" />{p}</li>)}
-        </ul>
-      </div>
-      <p className="text-xs text-slate-600">Reporting & KPI Analytics untuk Seller Marketplace & UMKM Indonesia</p>
-    </section>
-    <section className="flex items-center justify-center p-6">
-      <div className="w-full max-w-sm space-y-6 animate-fade-up">{children}</div>
-    </section>
+  <div className="sampe-auth min-h-screen bg-background text-foreground">
+    <header className="sampe-auth-header"><BrandWordmark /></header>
+    <main className="sampe-auth-layout">
+      <section className="sampe-auth-intro">
+        <p className="sampe-auth-eyebrow">Analisis KPI untuk seller & UMKM</p>
+        <h1>KPI toko harian,<br />terukur tiap hari.</h1>
+        <p>Pantau target, realisasi, dan perkembangan toko dalam satu tempat.</p>
+        <ul>{POINTS.map((p) => <li key={p}>{p}</li>)}</ul>
+      </section>
+      <section className="sampe-auth-access" aria-label="Akses SAMPE">
+        <div className="sampe-auth-content">{children}</div>
+      </section>
+    </main>
+    <footer className="sampe-auth-footer">SAMPE · System Analytic Marketplace</footer>
   </div>
 );
 
@@ -38,7 +37,6 @@ export const GoogleLogin = () => {
   return (
     <AuthShell>
       <div data-testid="google-login-page">
-        <div className="lg:hidden"><BrandWordmark compact /></div>
         <h2 className="mt-2 text-2xl font-extrabold tracking-tight">Masuk ke SAMPE</h2>
         <p className="mt-1 text-sm text-slate-400">Gunakan Gmail yang sama dengan email saat membeli lisensi di Lynk.id.</p>
       </div>

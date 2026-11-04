@@ -12,9 +12,10 @@ import { LiveTeamTable, MonthCompare } from "@/components/DashboardExtras";
 import { KpiAlertBanner } from "@/components/KpiAlertBanner";
 import { rupiah, rupiahFull, pct, statusBg, statusLabel, statusColor } from "@/lib/format";
 import { handleCardKeyDown } from "@/lib/cardInteraction.mjs";
+import { detailPercent, displayNumber } from "@/lib/detailFormat.mjs";
 import { TrendingUp, TrendingDown, Minus, Sparkles, Loader2, Clock, Target, Wallet, Radio, Users, Megaphone, ChevronRight } from "lucide-react";
 
-const CHART = ["#10B981", "#3B82F6", "#F59E0B", "#a855f7", "#EF4444", "#22d3ee", "#ec4899", "#94a3b8"];
+const CHART = ["#34d399", "#6da8b2", "#b5a582", "#8295b3", "#8bb096", "#ad96a5", "#a9b5bd", "#64748b"];
 
 const TipBox = ({ active, payload, label }) =>
   active && payload?.length ? (
@@ -26,27 +27,27 @@ const TipBox = ({ active, payload, label }) =>
     </div>
   ) : null;
 
-const metricCardInteraction = "group bg-[#161F30] border-slate-800 p-5 animate-fade-up motion-reduce:animate-none cursor-pointer transition-colors hover:border-emerald-500/40 active:border-emerald-500/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950";
+const metricCardInteraction = "group bg-[#161F30] border-slate-800 p-5 cursor-pointer transition-colors hover:border-emerald-500/40 active:border-emerald-500/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950";
 
 const MetricCard = ({ testid, icon: Icon, label, m, unit = "rp", onClick }) => {
-  const full = (v) => (unit === "rp" ? rupiahFull(v) : `${Number(v).toFixed(1)} jam`);
+  const full = (v) => (unit === "rp" ? rupiahFull(v) : `${displayNumber(v)} jam`);
   return (
-    <Card data-testid={testid} role="button" tabIndex={0} aria-label={`Lihat detail ${label}`} aria-haspopup="dialog" onClick={onClick} onKeyDown={(event) => handleCardKeyDown(event, onClick)} className={metricCardInteraction}>
-      <div className="flex items-start justify-between">
+    <Card data-testid={testid} role="button" tabIndex={0} aria-label={`Lihat detail ${label}`} aria-haspopup="dialog" onClick={onClick} onKeyDown={(event) => handleCardKeyDown(event, onClick)} className={`${metricCardInteraction} ${testid === "metric-sales" ? "sampe-metric-primary" : ""}`}>
+      <div className="sampe-metric-header flex items-start justify-between">
         <div className="flex items-center gap-2 text-slate-400">
           <Icon className="h-4 w-4" />
           <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
         </div>
         <Badge variant="outline" className={statusBg[m.status]}>{statusLabel[m.status]}</Badge>
       </div>
-      <p className="num mt-3 text-2xl sm:text-3xl font-bold text-white">{full(m.achieved)}</p>
-      <p className="text-xs text-slate-400">dari target {full(m.monthly_target)}</p>
-      <Progress value={Math.min(m.achieved_pct, 100)} className="mt-3 h-1.5 bg-slate-800" />
-      <div className="mt-2 flex items-center justify-between text-xs">
+      <p className="sampe-metric-value num mt-3 text-2xl sm:text-3xl font-bold text-white">{full(m.achieved)}</p>
+      <p className="sampe-metric-target text-xs text-slate-400">dari target {full(m.monthly_target)}</p>
+      <Progress value={Math.min(m.achieved_pct, 100)} className="sampe-metric-progress mt-3 h-1.5 bg-slate-800" />
+      <div className="sampe-metric-prorata mt-2 flex items-center justify-between text-xs">
         <span className="text-slate-400">Prorata s/d hari ini: <span className="num text-slate-200">{full(m.expected_to_date)}</span></span>
         <span className={`num font-semibold ${statusColor[m.status]}`}>{pct(m.achieved_pct)}</span>
       </div>
-      <div className="mt-2 flex items-center justify-between text-xs">
+      <div className="sampe-metric-gap mt-2 flex items-center justify-between text-xs">
         {m.gap > 0 ? (
           <span className="text-slate-400">Kurang <span className="num text-red-400">{full(m.gap)}</span> · butuh <span className="num text-amber-400">{full(m.needed_per_day)}/hari</span></span>
         ) : <span className="text-emerald-400">Target prorata tercapai</span>}
@@ -59,34 +60,32 @@ const MetricCard = ({ testid, icon: Icon, label, m, unit = "rp", onClick }) => {
 const DetailDialog = ({ open, onClose, detail }) => {
   if (!detail) return null;
   const { title, subtitle, rows, unit, showRoi } = detail;
-  const fmt = (v) => (unit === "jam" ? `${Number(v).toFixed(1)} jam` : rupiahFull(v));
+  const fmt = (v) => (unit === "jam" ? `${displayNumber(v)} jam` : rupiahFull(v));
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent data-testid="metric-detail-dialog" className="max-w-lg bg-slate-950 border-slate-800">
-        <DialogHeader>
-          <DialogTitle className="text-xl">{title}</DialogTitle>
+      <DialogContent data-testid="metric-detail-dialog" className="w-[calc(100vw-2rem)] min-w-0 max-w-lg max-h-[calc(100dvh-2rem)] overflow-hidden bg-slate-950 border-slate-800 p-4 sm:p-6">
+        <DialogHeader className="min-w-0 pr-8 text-left">
+          <DialogTitle className="break-words [overflow-wrap:anywhere] text-xl">{title}</DialogTitle>
           <DialogDescription className="sr-only">Rincian kontribusi {title}</DialogDescription>
-          <p className="text-sm text-slate-400">{subtitle}</p>
+          <p className="break-words [overflow-wrap:anywhere] text-sm text-slate-400">{subtitle}</p>
         </DialogHeader>
-        <div className="mt-2 space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+        <div className="mt-2 min-w-0 max-h-[60vh] overflow-x-hidden overflow-y-auto pr-1">
           {rows.length === 0 && <p className="text-sm text-slate-500 py-6 text-center">Belum ada data.</p>}
           {rows.map((r, i) => (
-            <div key={i} data-testid="detail-row" className="rounded-lg border border-slate-800 bg-[#161F30] p-3">
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-2 text-sm font-medium text-slate-200">
-                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: CHART[i % CHART.length] }} />
-                  {r.label}
-                </span>
-                <span className="num text-sm font-semibold text-emerald-400">{fmt(r.value)}{showRoi && r.roi != null ? ` · ${r.roi}x` : ""}</span>
+            <div key={i} data-testid="detail-row" className="min-w-0 border-b border-slate-800 py-4 first:pt-0 last:border-0 last:pb-0">
+              <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-3">
+                <span className="min-w-0 break-words [overflow-wrap:anywhere] text-sm font-medium text-slate-100">{r.label}</span>
+                <span className="num min-w-0 break-all text-right text-sm font-semibold text-slate-100">{fmt(r.value)}{showRoi && r.roi != null ? ` · ${displayNumber(r.roi, 2)}x` : ""}</span>
               </div>
-              <div className="mt-2 flex items-center gap-3">
-                <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
-                  <div className="h-full rounded-full" style={{ width: `${Math.min(r.pct_of_total, 100)}%`, background: CHART[i % CHART.length] }} />
-                </div>
-                <span className="num text-xs text-slate-400 w-28 text-right">{r.pct_of_total}% dari total</span>
+              <div className="mt-3 flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-xs text-slate-400">
+                <span>Kontribusi dari total</span>
+                <span className="num min-w-0 break-all text-right font-medium text-slate-200">{detailPercent(r.pct_of_total)}</span>
               </div>
-              <p className="num mt-1 text-xs text-slate-500">Kontribusi ke target KPI: <span className="text-slate-300">{r.pct_of_target}%</span></p>
-              {r.period && <p data-testid="detail-row-period" className="num mt-1 text-xs text-slate-500">Periode iklan: <span className="text-slate-300">{r.period}</span></p>}
+              <div aria-hidden="true" className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+                <div className="h-full rounded-full" style={{ width: `${Math.min(r.pct_of_total, 100)}%`, background: CHART[i % CHART.length] }} />
+              </div>
+              <p className="mt-2 break-words [overflow-wrap:anywhere] text-xs text-slate-400">Kontribusi ke target KPI: <span className="num text-slate-200">{detailPercent(r.pct_of_target)}</span></p>
+              {r.period && <p data-testid="detail-row-period" className="mt-1 break-words [overflow-wrap:anywhere] text-xs text-slate-400">Periode iklan: <span className="num text-slate-200">{r.period}</span></p>}
             </div>
           ))}
         </div>
@@ -109,22 +108,20 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
   const showAdsDetail = () => show({ title: "Efisiensi Ads per Platform", subtitle: "Belanja & ROAS per platform", rows: breakdowns.ads, unit: "rp", showRoi: true });
 
   return (
-    <div className="space-y-6" data-testid="analytics-dashboard-view">
+    <div className="sampe-dashboard space-y-6" data-testid="analytics-dashboard-view">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
+        <div className="sampe-dashboard-heading">
           <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">Dashboard Harian</p>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">{data.config.company_name}</h1>
           <p className="text-sm text-slate-400">
             Periode {data.config.month} · Hari ke-<span className="num">{month_meta.days_elapsed}</span> dari <span className="num">{month_meta.days_in_month}</span>
           </p>
         </div>
-        {!readOnly && <Button data-testid="ai-analysis-trigger-button" onClick={onAi} disabled={!onAi || aiLoading} aria-busy={aiLoading} className={`bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold ${anyRed ? "glow-danger" : ""}`}>
+        {!readOnly && <Button data-testid="ai-analysis-trigger-button" onClick={onAi} disabled={!onAi || aiLoading} aria-busy={aiLoading} className={`bg-amber-500 hover:bg-amber-600 text-slate-950 font-semibold ${anyRed ? "ring-1 ring-amber-300/60" : ""}`}>
           {aiLoading ? <Loader2 className="h-4 w-4 mr-1.5 motion-safe:animate-spin" /> : <Sparkles className="h-4 w-4 mr-1.5 motion-safe:hover:animate-pulse" />}
           {aiLoading ? "Menganalisis…" : "Analisa AI"}
         </Button>}
       </div>
-
-      <KpiAlertBanner data={data} onGoInput={readOnly ? undefined : onGoInput} />
 
       <Card data-testid="dashboard-time-vs-kpi-tracker" className="bg-[#161F30] border-slate-800 p-5">
         <div className="grid gap-5 sm:grid-cols-3">
@@ -146,7 +143,7 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
         </div>
       </Card>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="dashboard-prorate-metric-card">
+      <div className="sampe-metric-ledger grid gap-4 sm:grid-cols-2 lg:grid-cols-3" data-testid="dashboard-prorate-metric-card">
         <MetricCard testid="metric-sales" icon={Wallet} label="Penjualan" m={sales}
           onClick={() => show({ title: "Detail Penjualan", subtitle: "Kontribusi omzet per platform", rows: breakdowns.sales, unit: "rp" })} />
         <MetricCard testid="metric-ads" icon={Megaphone} label="Ads Spend" m={ads}
@@ -159,7 +156,7 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
           onClick={() => show({ title: "Detail Budget KOL", subtitle: "Budget per KOL", rows: breakdowns.kol, unit: "rp" })} />
         <Card data-testid="metric-ads-roi" role="button" tabIndex={0} aria-label="Lihat detail Efisiensi Ads per Platform" aria-haspopup="dialog" onClick={showAdsDetail} onKeyDown={(event) => handleCardKeyDown(event, showAdsDetail)} className={metricCardInteraction}>
           <div className="flex items-center gap-2 text-slate-400"><TrendingUp className="h-4 w-4" /><span className="text-xs font-semibold uppercase tracking-wider">Efisiensi Ads</span></div>
-          <p className="num mt-3 text-2xl sm:text-3xl font-bold text-white">{ads.roi.toFixed(2)}x</p>
+          <p className="num mt-3 text-2xl sm:text-3xl font-bold text-white">{displayNumber(ads.roi, 2)}x</p>
           <p className="text-xs text-slate-400">ROAS · Revenue {rupiah(ads.revenue)}</p>
           <div className="mt-3 flex items-center justify-between text-xs">
             <span className="text-slate-400">CPA rata-rata</span>
@@ -173,6 +170,8 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
         </Card>
       </div>
 
+      <KpiAlertBanner data={data} onGoInput={readOnly ? undefined : onGoInput} />
+
       <div className="grid gap-4 lg:grid-cols-5">
         <Card data-testid="dashboard-sales-chart" className="bg-[#161F30] border-slate-800 p-5 lg:col-span-3">
           <h3 className="text-lg font-semibold">Tren Penjualan Harian</h3>
@@ -181,8 +180,8 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
             <AreaChart data={sales_series} margin={{ left: -12, right: 8, top: 8 }}>
               <defs>
                 <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#10B981" stopOpacity={0.5} />
-                  <stop offset="100%" stopColor="#10B981" stopOpacity={0} />
+                  <stop offset="0%" stopColor="#10B981" stopOpacity={0.14} />
+                  <stop offset="100%" stopColor="#10B981" stopOpacity={0.01} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#1F2937" vertical={false} />
@@ -205,7 +204,7 @@ export const Dashboard = ({ data, compare, onAi, aiLoading = false, onGoInput, r
               <Tooltip content={<TipBox />} cursor={{ fill: "#1e293b55" }} />
               <Bar dataKey="omzet" name="Omzet" radius={[0, 6, 6, 0]}>
                 {channel_breakdown.map((_, i) => <Cell key={i} fill={CHART[i % CHART.length]} />)}
-                <LabelList dataKey="pct_of_target" position="right" formatter={(v) => `${v}% target`} fill="#cbd5e1" fontSize={10} className="num" />
+                <LabelList dataKey="pct_of_target" position="right" formatter={(v) => `${pct(v)} target`} fill="#cbd5e1" fontSize={10} className="num" />
               </Bar>
             </BarChart>
           </ResponsiveContainer>

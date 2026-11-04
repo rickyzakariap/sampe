@@ -9,7 +9,7 @@ import { monthLabel } from "@/lib/export";
 import { LicenseMenu } from "@/features/auth/LicenseMenu";
 
 export const TopNavbar = ({ view, setView, company, overallStatus, onQuickAdd, onAi, aiLoading = false, months, month, onMonthChange, onExportCsv, onExportPdf, onEditCompany, license, user, readOnly, onLogout }) => (
-  <header data-testid="top-navbar" className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800">
+  <header data-testid="top-navbar" className="sampe-navbar sticky top-0 z-50 bg-slate-950 border-b border-slate-800">
     <div className="mx-auto max-w-7xl px-4 sm:px-6">
       <div className="flex h-16 items-center justify-between gap-4">
         <div className="flex items-center gap-3 min-w-0">
