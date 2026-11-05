@@ -33,12 +33,14 @@ function DirectGoogleButton({ onAuthenticated }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.onload = async () => {
       try {
-        const { nonce } = await api.googleDirectChallenge();
+        if (!active) return;
+        const { nonce } = await api.googleDirectChallenge(controller.signal);
         if (!active || !buttonRef.current) return;
         window.google.accounts.id.initialize({
           client_id: process.env.REACT_APP_GOOGLE_CLIENT_ID,
@@ -65,7 +67,7 @@ function DirectGoogleButton({ onAuthenticated }) {
     };
     script.onerror = () => { if (active) setStatus('Tidak dapat memuat login Google.'); };
     document.head.appendChild(script);
-    return () => { active = false; script.remove(); };
+    return () => { active = false; controller.abort(); script.remove(); };
   }, [onAuthenticated]);
   return <div aria-busy={busy}><div ref={buttonRef} hidden={busy} /><p role="status" className="text-sm text-slate-400">{status}</p></div>;
 }

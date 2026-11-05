@@ -44,7 +44,7 @@ const adminHttp = withToken(ADMIN_TOKEN_KEY, () => window.dispatchEvent(new Even
 const d = (p) => p.then((r) => r.data);
 
 export const api = {
-  googleDirectChallenge: () => d(axios.post(`${API}/auth/google-direct/challenge`, {}, { withCredentials: true })),
+  googleDirectChallenge: (signal) => d(axios.post(`${API}/auth/google-direct/challenge`, {}, { withCredentials: true, signal })),
   googleDirectLogin: (credential) => d(axios.post(`${API}/auth/google-direct`, { credential }, { withCredentials: true })),
   googleSession: (session_id) => d(axios.post(`${API}/auth/google-session`, { session_id }, { withCredentials: true })),
   claim: (code) => d(http.post("/auth/claim", { code })),
