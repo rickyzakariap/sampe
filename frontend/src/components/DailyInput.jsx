@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api, currentMonth, errMsg } from "@/lib/api";
 import { rupiahFull } from "@/lib/format";
+import { displayNumber } from "@/lib/detailFormat.mjs";
+import { confirmEntryDeletion } from "@/lib/entryInteraction.mjs";
 import { Plus, Trash2, Wallet, Megaphone, Sparkles, Rocket, Radio, Users } from "lucide-react";
 
 const PLATFORMS = ["TikTok", "Shopee", "Tokopedia", "WhatsApp", "Meta", "Lazada", "Website", "Offline"];
@@ -65,7 +67,7 @@ export const DailyInput = ({ month, onChanged, initialTab = "sales", missingToda
   };
 
   return (
-    <div data-testid="daily-data-input-module" className="space-y-5">
+    <div data-testid="daily-data-input-module" className="sampe-input space-y-5">
       <div>
         <p className="text-xs font-semibold uppercase tracking-widest text-emerald-400">Modul Input Harian</p>
         <h1 className="text-3xl font-extrabold tracking-tight">List KPI</h1>
@@ -211,32 +213,37 @@ const PlatformSelect = ({ value, onChange }) => (
 );
 
 const EntryList = ({ module, entries, onDelete }) => {
-  if (!entries.length) return <p className="text-center text-sm text-slate-500 py-8">Belum ada data. Tambahkan entri pertamamu.</p>;
+  if (!entries.length) return <p className="text-center text-sm text-slate-400 py-8">Belum ada data. Tambahkan entri pertamamu.</p>;
+  const moduleLabel = MODULES.find((item) => item.key === module)?.label || module;
   return (
     <div data-testid={`${module}-entry-list`} className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
-      {entries.map((e) => (
-        <div key={e.id} data-testid="entry-row" className="flex items-center justify-between gap-3 border-b border-slate-800 px-4 py-3 last:border-0 hover:bg-slate-800/30">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="num text-xs text-slate-500 w-20 shrink-0">{e.date}</span>
-            {e.data.platform && <Badge variant="outline" className={platformBadge[e.data.platform]}>{e.data.platform}</Badge>}
-            <span className="truncate text-sm text-slate-200">{e.data.account || e.data.name || e.data.streamer || e.data.type}</span>
+      {entries.map((e) => {
+        const itemLabel = e.data.account || e.data.name || e.data.streamer || e.data.type;
+        const deleteLabel = `Hapus entri ${moduleLabel}${itemLabel ? ` ${itemLabel}` : ""} tanggal ${e.date}`;
+        return (
+          <div key={e.id} data-testid="entry-row" className="flex min-w-0 flex-col gap-2 border-b border-slate-800 px-4 py-3 last:border-0 hover:bg-slate-800/30 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="num text-xs text-slate-400 w-20 shrink-0">{e.date}</span>
+              {e.data.platform && <Badge variant="outline" className={platformBadge[e.data.platform]}>{e.data.platform}</Badge>}
+              <span className="min-w-0 break-words [overflow-wrap:anywhere] text-sm text-slate-200">{e.data.account || e.data.name || e.data.streamer || e.data.type}</span>
+            </div>
+            <div className="flex min-w-0 items-center justify-between gap-3 sm:justify-end">
+              <span className="num min-w-0 break-words [overflow-wrap:anywhere] text-sm font-semibold text-slate-100 sm:text-right">{summary(module, e.data)}</span>
+              {onDelete && <button type="button" data-testid="entry-delete" aria-label={deleteLabel} onClick={() => confirmEntryDeletion((message) => window.confirm(message), deleteLabel, () => onDelete(e.id))} className="grid min-h-11 min-w-11 shrink-0 place-items-center rounded text-slate-400 hover:text-red-400 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"><Trash2 aria-hidden="true" className="h-4 w-4" /></button>}
+            </div>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <span className="num text-sm font-semibold text-emerald-400">{summary(module, e.data)}</span>
-            {onDelete && <button data-testid="entry-delete" onClick={() => onDelete(e.id)} className="text-slate-500 hover:text-red-400 transition-colors"><Trash2 className="h-4 w-4" /></button>}
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
 
 const summary = (mod, d) => {
   if (mod === "sales") return rupiahFull(d.omzet);
-  if (mod === "ads") return `${d.start_date ? `${d.start_date} s/d ${d.end_date} · ` : ""}${rupiahFull(d.spend)} · ROAS ${d.roi}x`;
+  if (mod === "ads") return `${d.start_date ? `${d.start_date} s/d ${d.end_date} · ` : ""}${rupiahFull(d.spend)} · ROAS ${displayNumber(d.roi, 2)}x`;
   if (mod === "branding") return rupiahFull(d.spend);
   if (mod === "campaign") return `${rupiahFull(d.budget)} · ${d.duration_days}h`;
-  if (mod === "livestream") return `${d.duration_hours}j · ${rupiahFull(d.omzet)}`;
+  if (mod === "livestream") return `${displayNumber(d.duration_hours)} jam · ${rupiahFull(d.omzet)}`;
   if (mod === "kol") return [d.event, d.product, rupiahFull(d.budget)].filter(Boolean).join(" · ");
   return "";
 };

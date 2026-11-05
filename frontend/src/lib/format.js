@@ -1,15 +1,17 @@
+import { displayNumber } from "./detailFormat.mjs";
+
 export const rupiah = (n) => {
   const v = Number(n || 0);
-  if (Math.abs(v) >= 1_000_000_000) return `Rp${(v / 1_000_000_000).toFixed(1)}M`;
-  if (Math.abs(v) >= 1_000_000) return `Rp${(v / 1_000_000).toFixed(1)}jt`;
-  if (Math.abs(v) >= 1_000) return `Rp${(v / 1_000).toFixed(0)}rb`;
-  return `Rp${v.toFixed(0)}`;
+  if (Math.abs(v) >= 1_000_000_000) return `Rp${displayNumber(v / 1_000_000_000)}M`;
+  if (Math.abs(v) >= 1_000_000) return `Rp${displayNumber(v / 1_000_000)}jt`;
+  if (Math.abs(v) >= 1_000) return `Rp${displayNumber(v / 1_000, 0)}rb`;
+  return `Rp${displayNumber(v, 0)}`;
 };
 
 export const rupiahFull = (n) =>
   "Rp" + Number(n || 0).toLocaleString("id-ID", { maximumFractionDigits: 0 });
 
-export const pct = (n) => `${Number(n || 0).toFixed(1)}%`;
+export const pct = (n) => `${displayNumber(n || 0)}%`;
 
 export const statusColor = {
   green: "text-emerald-400",

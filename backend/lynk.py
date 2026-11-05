@@ -1,129 +1,45 @@
 """Integrasi Lynk.id: webhook order paid -> lisensi otomatis, halaman aktivasi, pengaturan admin."""
-import hashlib
-import hmac
 import json
 import logging
-import math
-import re
 from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from pymongo.errors import DuplicateKeyError, PyMongoError
+from core import db, DB_BACKEND
+if DB_BACKEND == "mongo":
+    from pymongo.errors import DuplicateKeyError, PyMongoError
+else:
+    class PyMongoError(Exception):
+        pass
 
-from core import db
-from auth import (get_admin, new_license, new_code, extend_fields, public_license, license_status,
+    class DuplicateKeyError(PyMongoError):
+        pass
+from auth import (get_admin, new_license, new_code, public_license, license_status,
                   check_lock, record_fail, client_ip)
+from license_rules import renewal_expires_at
+from lynk_contract import (SAMPE_PRODUCT, SAMPE_PRODUCT_DAYS, valid_buyer_email,
+                           parse_payload, signature_amount, signature_ok, product_days, renew_url)
 
 router = APIRouter(prefix="/api")
 log = logging.getLogger("lynk")
-SAMPE_PRODUCT = "SAMPE - System Analytic Marketplace"
-
-
-def days_from_title(title: str) -> Optional[int]:
-    t = (title or "").lower()
-    if re.search(r"\b(1|satu)\s*tahun\b", t) or re.search(r"\b365\s*hari\b", t):
-        return 365
-    m = re.search(r"\b(30|7|1)\s*hari\b", t)
-    return int(m.group(1)) if m else None
 
 
 async def lynk_settings() -> dict:
     return await db.settings.find_one({"key": "lynk"}, {"_id": 0}) or {"key": "lynk"}
 
 
-def _pick(d: dict, *keys):
-    for k in keys:
-        if isinstance(d, dict) and d.get(k) not in (None, ""):
-            return d[k]
-    return None
-
-
-def parse_payload(body: dict) -> dict:
-    if not isinstance(body, dict):
-        raise ValueError("Payload bukan objek")
-    data = body.get("data") or {}
-    if not isinstance(data, dict):
-        raise ValueError("Data bukan objek")
-    md = data.get("message_data") or {}
-    if not isinstance(md, dict):
-        raise ValueError("Message data bukan objek")
-    cust = md.get("customer") or {}
-    totals = md.get("totals") or {}
-    items = md.get("items") or []
-    if not isinstance(cust, dict) or not isinstance(totals, dict) or not isinstance(items, list):
-        raise ValueError("Struktur transaksi tidak valid")
-    parsed_items = []
-    for item in items:
-        if not isinstance(item, dict):
-            raise ValueError("Item bukan objek")
-        try:
-            qty = int(item.get("qty", 1))
-        except (TypeError, ValueError) as exc:
-            raise ValueError("Kuantitas item tidak valid") from exc
-        if qty < 1:
-            raise ValueError("Kuantitas item tidak valid")
-        parsed_items.append({"title": str(item.get("title") or item.get("name") or ""), "qty": qty})
-    return {
-        "ref_id": str(_pick(md, "refId", "ref_id", "order_id") or "").strip(),
-        "message_id": str(_pick(data, "message_id", "messageId") or "").strip(),
-        "email": str(_pick(cust, "email") or _pick(md, "email") or "").strip().lower(),
-        "name": str(_pick(cust, "name") or _pick(md, "name") or ""),
-        "phone": str(_pick(cust, "phone") or ""),
-        "items": parsed_items,
-        "grand_total": totals.get("grandTotal"),
-        "event": body.get("event"),
-        "message_action": data.get("message_action"),
-        "message_code": data.get("message_code"),
-    }
-
-
-def signature_amount(value) -> Optional[str]:
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        try:
-            if not math.isfinite(value):
-                return None
-            return str(int(value)) if value == int(value) else str(value)
-        except (OverflowError, ValueError):
-            return None
-    if isinstance(value, str):
-        return value.strip() or None
-    return None
-
-
-def signature_ok(p: dict, sig: str, key: str) -> bool:
-    amount = signature_amount(p["grand_total"])
-    if not sig or amount is None or not p["ref_id"] or not p["message_id"] or not key:
-        return False
-    expected = hashlib.sha256(f"{amount}{p['ref_id']}{p['message_id']}{key}".encode()).hexdigest()
-    return hmac.compare_digest(expected, sig.strip().lower())
-
-
-def product_days(items: list[dict]) -> tuple[int, bool]:
-    days = 0
-    includes_sampe = False
-    for item in items:
-        title = item["title"].strip()
-        is_sampe = title.casefold() == SAMPE_PRODUCT.casefold()
-        duration = 30 if is_sampe else days_from_title(title)
-        if duration:
-            days += duration * item["qty"]
-        includes_sampe = includes_sampe or is_sampe
-    return days, includes_sampe
-
-
-async def grant_license(email: str, name: str, days: int, ref_id: str, allow_extend: bool, session) -> tuple[Optional[dict], str]:
+async def grant_license(email: str, name: str, days: int, ref_id: str, session) -> tuple[Optional[dict], str]:
     owner = await db.members.find_one({"email": email}, {"_id": 0, "user_id": 1}, session=session)
     q = {"revoked": False, "$or": [{"email": email}] + ([{"owner_user_id": owner["user_id"]}] if owner else [])}
     lic = await db.licenses.find_one(q, {"_id": 0}, sort=[("created_at", -1)], session=session)
     if lic:
-        if not allow_extend:
+        if not lic.get("activated_at") or not lic.get("expires_at"):
             return None, "pending_policy"
-        upd = extend_fields(lic, days)
-        await db.licenses.update_one({"id": lic["id"]}, {"$set": upd}, session=session)
+        upd = {"expires_at": renewal_expires_at(lic, days, datetime.now(timezone.utc))}
+        result = await db.licenses.update_one({"id": lic["id"], "revoked": False}, {"$set": upd}, session=session)
+        if result.matched_count != 1:
+            raise PyMongoError("Lisensi renewal tidak tersedia")
         return lic | upd, "extended"
     lic = new_license(name or email, days, email, "lynk") | {"code": await new_code(), "lynk_ref_id": ref_id}
     await db.licenses.insert_one(dict(lic), session=session)
@@ -158,7 +74,7 @@ async def lynk_webhook(request: Request):
     if p["event"] != "payment.received":
         await _log("ignored", "Event bukan payment.received", request, p["ref_id"])
         return {"ok": True, "processed": False, "reason": "event diabaikan"}
-    if not p["ref_id"] or not p["email"] or not p["message_id"] or signature_amount(p["grand_total"]) is None:
+    if not p["ref_id"] or not valid_buyer_email(p["email"]) or not p["message_id"] or signature_amount(p["grand_total"]) is None:
         await _log("rejected", "Field transaksi wajib tidak tersedia", request, p["ref_id"])
         raise HTTPException(400, "Field transaksi wajib tidak tersedia")
     key = (await lynk_settings()).get("merchant_key")
@@ -176,6 +92,11 @@ async def lynk_webhook(request: Request):
     try:
         order, duplicate = await process_order(p)
     except Exception as exc:
+        if DB_BACKEND == "postgres":
+            from postgres.access import PolicyDecisionRequired
+            if isinstance(exc, PolicyDecisionRequired):
+                await _log("pending_policy", "Renewal lisensi dicabut menunggu keputusan", request, p["ref_id"])
+                raise HTTPException(409, "Order memerlukan keputusan kebijakan lisensi")
         log.error("Lynk order transaction failed: %s", type(exc).__name__)
         await _log("failed", "Transaksi database gagal", request, p["ref_id"])
         raise HTTPException(503, "Order gagal diproses sementara; aman untuk retry")
@@ -187,7 +108,12 @@ async def lynk_webhook(request: Request):
 
 
 async def process_order(p: dict) -> tuple[dict, bool]:
-    days, includes_sampe = product_days(p["items"])
+    if DB_BACKEND == "postgres":
+        from starlette.concurrency import run_in_threadpool
+        from postgres.access import PostgresAccess
+        result = await run_in_threadpool(PostgresAccess(db.dsn)._process_order, p)
+        return result, result["duplicate"]
+    days, _ = product_days(p["items"])
     order = {"ref_id": p["ref_id"], "message_id": p["message_id"], "email": p["email"], "name": p["name"], "phone": p["phone"],
              "product": ", ".join(i["title"] for i in p["items"]), "days": days,
              "created_at": datetime.now(timezone.utc).isoformat(), "license_id": None, "action": None,
@@ -202,7 +128,7 @@ async def process_order(p: dict) -> tuple[dict, bool]:
                     await db.lynk_email_locks.update_one(
                         {"_id": p["email"]}, {"$set": {"touched_at": datetime.now(timezone.utc).isoformat()}},
                         upsert=True, session=session)
-                    lic, action = await grant_license(p["email"], p["name"], days, p["ref_id"], not includes_sampe, session)
+                    lic, action = await grant_license(p["email"], p["name"], days, p["ref_id"], session)
                     if lic:
                         order.update({"license_id": lic["id"], "action": action, "status": "processed"})
                     else:
@@ -260,7 +186,7 @@ class SettingsIn(BaseModel):
 async def get_lynk(_: dict = Depends(get_admin)):
     s = await lynk_settings()
     key = s.get("merchant_key") or ""
-    return {"merchant_key_set": bool(key), "merchant_key_hint": f"…{key[-4:]}" if key else None, "renew_url": s.get("renew_url"), "default_days": s.get("default_days")}
+    return {"merchant_key_set": bool(key), "merchant_key_hint": f"…{key[-4:]}" if key else None, "renew_url": renew_url(s.get("renew_url")), "default_days": s.get("default_days")}
 
 
 @router.put("/admin/lynk")

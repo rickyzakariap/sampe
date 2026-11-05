@@ -1,0 +1,2 @@
+# PostgreSQL migration and explicit PostgreSQL runtime selection.
+psycopg[binary]>=3.2,<4

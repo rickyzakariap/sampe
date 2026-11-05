@@ -49,7 +49,7 @@ export const RenewSoonBanner = ({ license, renewUrl }) => {
   if (license.status !== "active" || left == null || left > 3) return null;
   return (
     <div data-testid="license-renew-soon-banner" className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-center text-sm text-amber-200">
-      Lisensi kamu habis dalam <b className="num">{left} hari</b>. Perpanjang sekarang dengan email yang sama — sisa hari tetap terhitung.
+      Lisensi kamu habis dalam <b className="num">{left} hari</b>. Perpanjang dengan email yang sama. Sisa hari tetap terhitung.
       <RenewLink url={renewUrl} testid="renew-soon-link" />
     </div>
   );

@@ -1,15 +1,30 @@
-@import url('https://api.fontshare.com/v2/css?f[]=cabinet-grotesk@700,800,900&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/fonts/instrument-sans-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Instrument Sans';
+  src: url('/fonts/instrument-sans-latin-ext.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1EFF, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 @source not inline('overline');
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-heading: 'Cabinet Grotesk', 'Plus Jakarta Sans', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-heading: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
 
   --radius-lg: var(--radius);
   --radius-md: calc(var(--radius) - 2px);
@@ -59,6 +74,7 @@
   body {
     margin: 0;
     font-family: var(--font-sans);
+    font-synthesis: none;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -130,4 +146,16 @@
 
 .animate-fade-up { animation: fade-up 0.5s ease-out both; }
 .glow-danger { animation: pulse-glow 2s infinite; }
-.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.num { font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.85; cursor: pointer; }
+
+.ai-analysis-panel[data-state="open"],
+.ai-analysis-panel[data-state="closed"] {
+  animation-duration: 220ms !important;
+  transition-duration: 220ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-analysis-panel { animation: none !important; transition: none !important; }
+  .glow-danger { animation: none; }
+}

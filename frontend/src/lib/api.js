@@ -44,6 +44,8 @@ const adminHttp = withToken(ADMIN_TOKEN_KEY, () => window.dispatchEvent(new Even
 const d = (p) => p.then((r) => r.data);
 
 export const api = {
+  googleDirectChallenge: () => d(axios.post(`${API}/auth/google-direct/challenge`, {}, { withCredentials: true })),
+  googleDirectLogin: (credential) => d(axios.post(`${API}/auth/google-direct`, { credential }, { withCredentials: true })),
   googleSession: (session_id) => d(axios.post(`${API}/auth/google-session`, { session_id }, { withCredentials: true })),
   claim: (code) => d(http.post("/auth/claim", { code })),
   logout: () => d(http.post("/auth/logout")),
@@ -62,6 +64,17 @@ export const api = {
   seed: (company_name) => d(http.post("/seed", { company_name })),
   reset: () => d(http.post("/reset")),
   compare: (month) => d(http.get("/compare", { params: { month } })),
+  ownerReportManage: () => d(http.get("/owner-report/manage")),
+  ownerReportCreate: () => d(http.post("/owner-report/manage")),
+  ownerReportRotate: () => d(http.post("/owner-report/rotate")),
+  ownerReportRevoke: () => d(http.delete("/owner-report/manage")),
+};
+
+// The share credential is sent in a header, never in an API query or analytics event.
+const ownerHttp = axios.create({ baseURL: API, withCredentials: false });
+const ownerHeaders = (shareId) => ({ headers: { "X-Owner-Report-Link": shareId } });
+export const ownerReportApi = {
+  data: (shareId, month) => d(ownerHttp.get("/owner-report/data", { ...ownerHeaders(shareId), params: { month } })),
 };
 
 export const adminApi = {

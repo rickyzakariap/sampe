@@ -4,7 +4,7 @@ from datetime import date
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
-from core import db, KpiConfig, ConfigInput, Entry, shift_month
+from core import db, DB_BACKEND, KpiConfig, ConfigInput, Entry, shift_month
 from auth import get_tenant, require_write
 
 router = APIRouter(prefix="/api")
@@ -19,6 +19,9 @@ async def get_config(p: dict = Depends(get_tenant)):
 
 @router.post("/config")
 async def save_config(payload: ConfigInput, p: dict = Depends(require_write)):
+    if DB_BACKEND == "postgres":
+        doc = KpiConfig(**payload.model_dump()).model_dump() | {"tenant_id": p["tenant_id"]}
+        return await db.save_kpi_config(doc)
     existing = await db.kpi_config.find_one({"tenant_id": p["tenant_id"], "month": payload.month})
     doc = KpiConfig(**payload.model_dump()).model_dump() | {"tenant_id": p["tenant_id"]}
     if existing:
@@ -55,8 +58,9 @@ async def seed_demo(payload: Optional[SeedInput] = None, p: dict = Depends(requi
     company = ((payload.company_name if payload else None) or "").strip() or "Toko Demo"
     today = date.today()
     month = f"{today.year}-{today.month:02d}"
-    await db.kpi_config.delete_many({"tenant_id": tid})
-    await db.entries.delete_many({"tenant_id": tid})
+    if DB_BACKEND != "postgres":
+        await db.kpi_config.delete_many({"tenant_id": tid})
+        await db.entries.delete_many({"tenant_id": tid})
 
     cfg = KpiConfig(
         company_name=company[:80],
@@ -71,7 +75,8 @@ async def seed_demo(payload: Optional[SeedInput] = None, p: dict = Depends(requi
         target_live_hours=180,
         target_live_revenue=150_000_000,
     )
-    await db.kpi_config.insert_one(cfg.model_dump() | {"tenant_id": tid})
+    if DB_BACKEND != "postgres":
+        await db.kpi_config.insert_one(cfg.model_dump() | {"tenant_id": tid})
 
     import random
     random.seed(7)
@@ -120,13 +125,18 @@ async def seed_demo(payload: Optional[SeedInput] = None, p: dict = Depends(requi
             entries.append(Entry(module="ads", date=ds, data={"account": "Meta Ads", "platform": "Meta", "spend": spend, "revenue": int(spend * 3), "roi": 3.0, "start_date": ds, "end_date": ds}).model_dump())
             entries.append(Entry(module="livestream", date=ds, data={"streamer": streamers[d % 4], "start_time": "19:00", "end_time": "22:00", "duration_hours": 3, "omzet": int(random.uniform(3_000_000, 6_000_000) * factor)}).model_dump())
 
-    if entries:
+    if DB_BACKEND == "postgres":
+        await db.replace_tenant_demo(tid, cfg.model_dump() | {"tenant_id": tid},
+                                     [e | {"tenant_id": tid} for e in entries])
+    elif entries:
         await db.entries.insert_many([e | {"tenant_id": tid} for e in entries])
     return {"ok": True, "month": month, "entries": len(entries)}
 
 
 @router.post("/reset")
 async def reset_all(p: dict = Depends(require_write)):
+    if DB_BACKEND == "postgres":
+        return await db.reset_tenant(p["tenant_id"])
     cfg = await db.kpi_config.delete_many({"tenant_id": p["tenant_id"]})
     ent = await db.entries.delete_many({"tenant_id": p["tenant_id"]})
     return {"ok": True, "deleted_config": cfg.deleted_count, "deleted_entries": ent.deleted_count}

@@ -1,4 +1,3 @@
-from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 import os
 import uuid
@@ -10,9 +9,24 @@ from datetime import datetime, timezone
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+DB_BACKEND = os.environ.get("SAMPE_DB_BACKEND", "mongo").strip().lower()
+if DB_BACKEND == "postgres":
+    if os.name == "nt":
+        import asyncio
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    if os.environ.get("SAMPE_POSTGRES_ENV") not in ("testing", "staging", "production"):
+        raise RuntimeError("PostgreSQL backend requires an explicit testing, staging, or production environment")
+    from postgres.compat import PgDatabase
+    db = PgDatabase(os.environ.get("SAMPE_POSTGRES_DSN"))
+    client = db.client
+elif DB_BACKEND == "mongo":
+    if any(os.environ.get(key) for key in ("SAMPE_POSTGRES_ENV", "SAMPE_POSTGRES_DSN", "SAMPE_POSTGRES_TARGET_DB")):
+        raise RuntimeError("PostgreSQL configuration is set but SAMPE_DB_BACKEND does not select PostgreSQL")
+    from motor.motor_asyncio import AsyncIOMotorClient
+    client = AsyncIOMotorClient(os.environ['MONGO_URL'])
+    db = client[os.environ['DB_NAME']]
+else:
+    raise RuntimeError(f"Unsupported SAMPE_DB_BACKEND: {DB_BACKEND}")
 
 
 EMERGENT_LLM_KEY = os.environ.get('EMERGENT_LLM_KEY')

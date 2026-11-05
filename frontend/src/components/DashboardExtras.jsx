@@ -2,7 +2,8 @@ import { Card } from "@/components/ui/card";
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from "recharts";
-import { rupiah, rupiahFull } from "@/lib/format";
+import { rupiah, rupiahFull, pct } from "@/lib/format";
+import { displayNumber } from "@/lib/detailFormat.mjs";
 import { monthLabel } from "@/lib/export";
 import { Radio, CalendarRange, TrendingUp, TrendingDown } from "lucide-react";
 
@@ -36,10 +37,10 @@ export const LiveTeamTable = ({ rows }) => {
                   <td className="py-2.5 pr-2">
                     <span className="font-medium text-slate-200">{r.streamer}</span>
                     {r.streamer === best && rows.length > 1 && <span className="ml-1.5 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-400">TOP</span>}
-                    <p className="num text-[11px] text-slate-500">{r.pct_of_total}% omzet live · {r.pct_of_target}% target</p>
+                    <p className="num text-[11px] text-slate-400">{pct(r.pct_of_total)} omzet live · {pct(r.pct_of_target)} target</p>
                   </td>
                   <td className="num py-2.5 px-2 text-right text-slate-300">{r.sessions}</td>
-                  <td className="num py-2.5 px-2 text-right text-slate-300">{r.hours}</td>
+                  <td className="num py-2.5 px-2 text-right text-slate-300">{displayNumber(r.hours)}</td>
                   <td className="num py-2.5 px-2 text-right font-semibold text-emerald-400">{rupiah(r.omzet)}</td>
                   <td className="num py-2.5 pl-2 text-right text-slate-400">{rupiah(r.omzet_per_hour)}</td>
                 </tr>
@@ -57,7 +58,7 @@ const CompareTip = ({ active, payload, label }) =>
     <div className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs shadow-xl">
       <p className="mb-1 font-semibold text-slate-200">{label}</p>
       {payload.map((p) => <p key={p.dataKey} className="num" style={{ color: p.color }}>{p.name}: {rupiahFull(p.value)}</p>)}
-      <p className="num mt-1 text-slate-400">Target tercapai: {payload[0].payload.achieved_pct}%</p>
+      <p className="num mt-1 text-slate-400">Target tercapai: {pct(payload[0].payload.achieved_pct)}</p>
     </div>
   ) : null;
 
@@ -75,7 +76,7 @@ export const MonthCompare = ({ rows }) => {
         </div>
         {delta != null && (
           <span data-testid="month-compare-delta" className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold num ${delta >= 0 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400" : "border-red-500/30 bg-red-500/10 text-red-400"}`}>
-            <Up className="h-3 w-3" />{delta >= 0 ? "+" : ""}{delta.toFixed(1)}% omzet vs bulan lalu
+            <Up className="h-3 w-3" />{delta >= 0 ? "+" : ""}{pct(delta)} omzet vs bulan lalu
           </span>
         )}
       </div>
@@ -83,7 +84,7 @@ export const MonthCompare = ({ rows }) => {
         {data.map((r) => (
           <div key={r.month} data-testid={`month-compare-pct-${r.month}`} className="rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">
             <p className="text-[11px] text-slate-500">{r.label}</p>
-            <p className={`num text-lg font-bold ${r.achieved_pct >= 100 ? "text-emerald-400" : r.achieved_pct >= 80 ? "text-amber-400" : "text-slate-200"}`}>{r.achieved_pct}%</p>
+            <p className={`num text-lg font-bold ${r.achieved_pct >= 100 ? "text-emerald-400" : r.achieved_pct >= 80 ? "text-amber-400" : "text-slate-200"}`}>{pct(r.achieved_pct)}</p>
             <p className="text-[10px] text-slate-500">pencapaian target</p>
           </div>
         ))}
